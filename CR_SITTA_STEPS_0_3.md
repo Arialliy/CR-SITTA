@@ -29,6 +29,8 @@ outputs, matching spatial sizes, and an unchanged model-state SHA256.
 
 Each dataset result contains `metrics.json`, one JSONL record per test image,
 20 prediction visualizations, and a contact sheet used for visual inspection.
+The artifact-manifest builder deterministically assembles each contact sheet
+from those 20 PNGs with the locked Pillow version.
 
 ## Corruption calibration
 

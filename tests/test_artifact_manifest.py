@@ -2,7 +2,14 @@ from pathlib import Path
 
 import pytest
 
-from scripts.build_artifact_manifest import artifact_record, artifact_tree, sha256_file
+from PIL import Image
+
+from scripts.build_artifact_manifest import (
+    artifact_record,
+    artifact_tree,
+    build_contact_sheet,
+    sha256_file,
+)
 
 
 def test_artifact_record_is_portable_and_exact(tmp_path: Path) -> None:
@@ -46,3 +53,31 @@ def test_artifact_record_rejects_external_path(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="outside the project"):
         artifact_record(external, project)
+
+
+def test_build_contact_sheet_is_deterministic_and_has_expected_layout(
+    tmp_path: Path,
+) -> None:
+    visualizations = tmp_path / "visualizations"
+    visualizations.mkdir()
+    for index in range(20):
+        image = Image.new("RGB", (40, 10), (index, 0, 0))
+        image.save(visualizations / f"{index:02d}.png")
+    destination = tmp_path / "contact.png"
+
+    build_contact_sheet(visualizations, destination, columns=2, tile_width=20)
+    first_hash = sha256_file(destination)
+    build_contact_sheet(visualizations, destination, columns=2, tile_width=20)
+
+    assert sha256_file(destination) == first_hash
+    with Image.open(destination) as contact:
+        assert contact.size == (40, 50)
+
+
+def test_build_contact_sheet_requires_exactly_twenty_images(tmp_path: Path) -> None:
+    visualizations = tmp_path / "visualizations"
+    visualizations.mkdir()
+    Image.new("RGB", (10, 10)).save(visualizations / "only.png")
+
+    with pytest.raises(ValueError, match="exactly 20"):
+        build_contact_sheet(visualizations, tmp_path / "contact.png")

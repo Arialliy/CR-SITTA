@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 import yaml
+from PIL import Image
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -82,6 +83,54 @@ def artifact_tree(
         "file_count": len(members),
         "files": members,
     }
+
+
+def build_contact_sheet(
+    visualization_directory: Path,
+    destination: Path,
+    *,
+    columns: int = 2,
+    tile_width: int = 512,
+) -> None:
+    """Deterministically tile the 20 Source visualizations without ImageMagick."""
+
+    paths = sorted(visualization_directory.glob("*.png"))
+    if len(paths) != 20:
+        raise ValueError(
+            f"contact sheet requires exactly 20 PNGs, found {len(paths)} in "
+            f"{visualization_directory}"
+        )
+    if columns < 1 or tile_width < 1 or len(paths) % columns:
+        raise ValueError("contact-sheet columns/width must form complete positive rows")
+
+    tiles: list[Image.Image] = []
+    try:
+        for path in paths:
+            with Image.open(path) as source:
+                rgb = source.convert("RGB")
+                height = max(1, round(rgb.height * tile_width / rgb.width))
+                tiles.append(
+                    rgb.resize((tile_width, height), resample=Image.Resampling.LANCZOS)
+                )
+        row_heights = [
+            max(tile.height for tile in tiles[start : start + columns])
+            for start in range(0, len(tiles), columns)
+        ]
+        canvas = Image.new("RGB", (columns * tile_width, sum(row_heights)), "white")
+        top = 0
+        for row, row_height in enumerate(row_heights):
+            for column in range(columns):
+                tile = tiles[row * columns + column]
+                canvas.paste(tile, (column * tile_width, top))
+            top += row_height
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = destination.with_name(f".{destination.name}.{os.getpid()}.tmp")
+        canvas.save(temporary, format="PNG")
+        os.replace(temporary, destination)
+    finally:
+        for tile in tiles:
+            tile.close()
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -196,7 +245,15 @@ def _pilot_entry(
             ],
             "selected_count": pilot["selection"]["selected_count"],
             "condition_count": pilot["condition_count"],
-            "severity_table": pilot["severity_table"],
+            "severity_table": {
+                key: pilot["severity_table"][key]
+                for key in (
+                    "status",
+                    "frozen",
+                    "calibration_required",
+                    "calibration_completed",
+                )
+            },
             "trend_classifications": trend_classes,
             "runtime_code_sha256": (
                 pilot["repository_provenance"]["file_sha256"]
@@ -235,6 +292,11 @@ def build_manifest(project_root: Path = PROJECT_ROOT) -> dict[str, Any]:
     frozen_confirmation: dict[str, Any] = {}
     implementation_commits: set[str] = set()
     for dataset in DATASETS:
+        source_root = project_root / "results" / "source_reproduction" / dataset
+        build_contact_sheet(
+            source_root / "visualizations",
+            source_root / "contact_sheet.png",
+        )
         source[dataset], source_commit = _source_entry(project_root, dataset)
         implementation_commits.add(source_commit)
         calibration[dataset], _ = _pilot_entry(
@@ -296,6 +358,10 @@ def build_manifest(project_root: Path = PROJECT_ROOT) -> dict[str, Any]:
         "contracts": {
             "protocol": artifact_record(protocol_path, project_root),
             "severity_table": artifact_record(severity_path, project_root),
+            "manifest_builder": artifact_record(
+                project_root / "scripts" / "build_artifact_manifest.py",
+                project_root,
+            ),
             "provisional_severity_archive": artifact_record(
                 project_root / severity["calibration"]["provisional_table_archive"],
                 project_root,
