@@ -1,0 +1,77 @@
+schema_version: 1
+
+# Frozen after the Step 3 source-domain pilot.  Calibration used deterministic
+# SHA256-ranked subsets of the official trainval splits only; the runner
+# verified zero overlap with either frozen official test split.  Target-test
+# labels were not used to tune these values.
+status: engineering_v1_frozen_after_source_trainval_pilot
+frozen: true
+calibration:
+  required: true
+  completed: true
+  paper_grade_independent_source_holdout_completed: false
+  limitation: upstream_checkpoint_was_trained_on_the_full_official_trainval_split
+  scope: source_domain_official_trainval_subset_only_no_target_test_ids
+  protocol: sha256_ranked_64_samples_per_dataset_seed_42
+  provisional_table_sha256: 3f2a1e3feb490d65902cb8860a11ed2cede7e5240d905d7f94070d672af94fb0
+  provisional_table_archive: artifacts/protocol/severity_tables.provisional.yaml
+  evidence:
+    IRSTD-1k:
+      split_sha256: b698d2d9dbe9e26e1875978d23450e1e6ec45fd71d56d31415007f56c40bba88
+      selected_ids_sha256: 09a27c1d085bb5816da442fbcd50998b9716d757ad9cc914d86e75d9ea0978d6
+      checkpoint_sha256: 9b22e5dfa82e033cb85009d74db5db637cde1dc186fd302f5aaba4515dee2d6b
+      pilot_artifact_sha256: fdd145ec346997b6c90a9c2344a4cb573171c4b286f9b0bda15e3b3824316a1e
+    NUAA-SIRST:
+      split_sha256: 294192853ec996b885d13109de724e93bcd0cf79bc41317d65a2ce67a914ec4c
+      selected_ids_sha256: a7751fe48d676725c9ee909f5453dc9fadaea192bad0787947bcacf2aa7c6326
+      checkpoint_sha256: ed76bc3b0b24b7986c69fd01e002aa911ad6c0528702f7e493029ea01a795a43
+      pilot_artifact_sha256: d10bd774174303dd3d24e4accbadd7e79c36d9578a48b9dec0b52634e839170f
+
+corruptions:
+  clean:
+    strength_parameter: null
+    monotonic: identity
+    levels:
+      0: {}
+
+  gaussian_noise:
+    strength_parameter: sigma
+    monotonic: increasing
+    levels:
+      1: {sigma: 0.005}
+      2: {sigma: 0.010}
+      3: {sigma: 0.020}
+      4: {sigma: 0.035}
+      5: {sigma: 0.055}
+
+  gaussian_blur:
+    strength_parameter: sigma
+    monotonic: increasing
+    levels:
+      1: {sigma: 0.40}
+      2: {sigma: 0.70}
+      3: {sigma: 1.00}
+      4: {sigma: 1.50}
+      5: {sigma: 2.20}
+
+  low_contrast:
+    # A smaller factor means a stronger contraction toward the per-channel
+    # spatial mean, hence strength is monotonic decreasing in this parameter.
+    strength_parameter: contrast_factor
+    monotonic: decreasing
+    levels:
+      1: {contrast_factor: 0.90}
+      2: {contrast_factor: 0.78}
+      3: {contrast_factor: 0.65}
+      4: {contrast_factor: 0.50}
+      5: {contrast_factor: 0.35}
+
+  stripe_noise:
+    strength_parameter: amplitude
+    monotonic: increasing
+    levels:
+      1: {amplitude: 0.005, smooth_sigma_pixels: 1.5}
+      2: {amplitude: 0.010, smooth_sigma_pixels: 1.5}
+      3: {amplitude: 0.020, smooth_sigma_pixels: 1.5}
+      4: {amplitude: 0.035, smooth_sigma_pixels: 1.5}
+      5: {amplitude: 0.055, smooth_sigma_pixels: 1.5}

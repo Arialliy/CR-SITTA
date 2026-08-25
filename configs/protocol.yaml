@@ -1,0 +1,154 @@
+schema_version: 1
+protocol_id: cr-sitta-nsfpn-v1
+frozen_at: "2026-08-25"
+host:
+  repository: https://github.com/mengduann/NS-FPN
+  base_commit: b857bef068ba48f1258b62de6bf082f73dbafde4
+  branch: cr-sitta
+
+environment:
+  platform: linux-64
+  python: "3.10"
+  torch: 2.1.2
+  torch_cuda_runtime: "12.1"
+  conda_explicit_lock: environment.linux-64.explicit.txt
+  conda_explicit_lock_sha256: 54c4e5112e38cbb0fe15c314b2c24b933fcd4eddf2c2f48a776c195a22fa53f7
+  python_package_snapshot: requirements.lock.txt
+  python_package_snapshot_sha256: fa14fd49712fac40d794d040f8937a5c08016df37b1ac3a9ad091aa91aed921f
+  declarative_environment: environment.cr-sitta.yml
+  declarative_environment_sha256: 03f5583e24f173b91a7332e482c9e2b75f656d019a584c16107317f6f3098431
+  sfs_build_script: scripts/build_sfs.sh
+  sfs_build_script_sha256: 76304ea3cf5837f1285fcd7ff224fb5e183b445ff37408cf8bfde375600bc7ba
+  sfs_host_toolchain:
+    cuda_toolkit: "12.2"
+    c_compiler: /usr/bin/gcc-12
+    cxx_compiler: /usr/bin/g++-12
+    cuda_arch_list: "8.6"
+
+datasets:
+  IRSTD-1k:
+    root_env: CR_SITTA_IRSTD1K_ROOT
+    trainval_split: dataset/IRSTD-1k/trainval.txt
+    trainval_split_sha256: b698d2d9dbe9e26e1875978d23450e1e6ec45fd71d56d31415007f56c40bba88
+    trainval_images: 800
+    test_split: dataset/IRSTD-1k/test.txt
+    test_split_sha256: 8c71e474358acb84f2cbebfd1282ffea236f9cb852b7f7c04feb2fd99804c579
+    test_images: 201
+    corpus_manifest_algorithm: sorted-id-tab-v1
+    corpus_manifest_sha256: aea570d7afdc2dbbb5ebeac1774b86bac78531d79162a134b0c80b3af1605d36
+    checkpoint: weights/IRSTD-1k_MSHNet_NSFPN.pkl
+    checkpoint_url: https://drive.google.com/file/d/1agnCjpJJa3J3-Aw8XqDKtpcTA6xDuHO4/view
+    checkpoint_sha256: 9b22e5dfa82e033cb85009d74db5db637cde1dc186fd302f5aaba4515dee2d6b
+    upstream_reported_metrics:
+      iou: 0.6934
+      pd: 0.9558
+      fa_per_pixel_x1e6: 8.35
+  NUAA-SIRST:
+    root_env: CR_SITTA_NUAA_ROOT
+    trainval_split: dataset/NUAA-SIRST/trainval.txt
+    trainval_split_sha256: 294192853ec996b885d13109de724e93bcd0cf79bc41317d65a2ce67a914ec4c
+    trainval_images: 341
+    test_split: dataset/NUAA-SIRST/test.txt
+    test_split_sha256: f39c8ee65d3cca38c5534de63ce7022720c52512265c0327584435934ee93da2
+    test_images: 86
+    corpus_manifest_algorithm: sorted-id-tab-v1
+    corpus_manifest_sha256: 667e19d51558ad9b80f461f4e05d3c8517e6b16a20d00bda5572d3b416a661dd
+    checkpoint: weights/NUAA-SIRST_MSHNet_NSFPN.pkl
+    checkpoint_url: https://drive.google.com/file/d/17zgfkbkPdLGyOLDz_MFNbUQI9J2bmgiI/view
+    checkpoint_sha256: ed76bc3b0b24b7986c69fd01e002aa911ad6c0528702f7e493029ea01a795a43
+    upstream_reported_metrics:
+      iou: 0.7874
+      pd: 1.0
+      fa_per_pixel_x1e6: 1.24
+
+data:
+  image_directories: [img, images]
+  mask_directories: [label, masks]
+  file_extension: .png
+  input_color: RGB
+  physical_intensity_range: [0.0, 1.0]
+  mask_value_range: [0.0, 1.0]
+  mask_handling:
+    dataset: preserve_nearest_resized_values
+    official_adapter: preserve_legacy_values
+    unified_foreground_rule: strict_greater_than_zero
+  test_resize:
+    height: 256
+    width: 256
+    image_interpolation: bilinear
+    mask_interpolation: nearest
+  normalization:
+    order: after_corruption
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+
+source_inference:
+  architecture: MSHNet_NSFPN
+  input_channels: 3
+  output: raw_single_channel_logit
+  warm_flag: false
+  batch_size: 1
+  mode: eval
+  random_seed: 42
+  deterministic_algorithms: true
+  visualization_count: 20
+  reproduction_tolerance:
+    iou_absolute: 0.002
+    pd_absolute: 0.01
+    fa_per_pixel_x1e6_absolute: 1.0
+
+adaptation:
+  episode: one_image
+  reset_after_each_image: true
+  steps: 1
+  adaptable_module: torch.nn.BatchNorm2d
+  adaptable_tensors: [weight, bias]
+  freeze_all_other_parameters: true
+  bn_protocols:
+    batch_stats:
+      use_current_image_spatial_statistics: true
+      update_running_statistics: false
+    source_stats:
+      use_frozen_running_mean_variance: true
+
+postprocessing:
+  probability_transform: sigmoid_once
+  operating_threshold: 0.5
+  threshold_selection:
+    data: source_domain_trainval_only
+    rule: fixed_at_0.5_for_v1
+    target_test_labels_forbidden: true
+  connected_components:
+    foreground_connectivity_2d: 8
+  target_matching:
+    assignment: hungarian_minimum_centroid_distance
+    centroid_distance_pixels: 3.0
+    comparison: strict_less_than
+    one_to_one: true
+  froc:
+    probability_thresholds: [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]
+
+corruptions:
+  domain: physical_intensity_before_normalization
+  clean_severity: 0
+  names: [clean, gaussian_noise, gaussian_blur, low_contrast, stripe_noise]
+  severity_levels: [1, 2, 3, 4, 5]
+  table: corruptions/severity_tables.yaml
+  table_sha256: d0012bc25a78e32a25334241db5d7c1e2f55f160086068eec52a67fa4a702e1f
+  table_frozen: true
+  base_seed: 42
+  sample_seed_key: [image_id, corruption, severity, base_seed]
+  clip_output_to_unit_interval: true
+  corrupt_mask: false
+  calibration_data: source_domain_trainval_only
+  calibration_subset: sha256_ranked_64_samples_per_dataset
+  target_test_labels_forbidden: true
+
+fairness_contract:
+  shared_postprocessing: true
+  shared_evaluator: metrics.UnifiedResearchEvaluator
+  official_evaluator_use: source_reproduction_only
+  hyperparameter_selection_data:
+    - source_domain_trainval
+    - source_domain_synthetic_corruption_validation
+  target_test_tuning_forbidden: true

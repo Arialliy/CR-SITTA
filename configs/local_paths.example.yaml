@@ -1,0 +1,5 @@
+# Copy to configs/local_paths.yaml (ignored by git) or export the environment
+# variables named in configs/protocol.yaml.
+datasets:
+  IRSTD-1k: /path/to/IRSTD-1K
+  NUAA-SIRST: /path/to/NUAA-SIRST

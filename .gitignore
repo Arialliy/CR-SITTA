@@ -138,6 +138,9 @@ celerybeat.pid
 .env
 .envrc
 .venv
+.conda/
+.mamba-root/
+.tools/
 env/
 venv/
 ENV/
@@ -200,6 +203,18 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# CR-SITTA runtime artifacts and machine-local configuration
+weights/*.pkl
+weights/*.pth
+weights/*.pt
+results/**
+!results/.gitkeep
+configs/local_paths.yaml
+third_party/*
+!third_party/.gitkeep
+dataset/*/img
+dataset/*/label
 
 # Marimo
 marimo/_static/

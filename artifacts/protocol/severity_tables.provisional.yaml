@@ -1,0 +1,61 @@
+schema_version: 1
+
+# PROVISIONAL: these strengths are engineering defaults only. They must be
+# calibrated with the source-domain holdout pilot described in Step 3 before
+# any paper experiment, then frozen and versioned. Target-test labels must not
+# be used to tune these values.
+status: provisional_pending_source_domain_pilot
+frozen: false
+calibration:
+  required: true
+  completed: false
+  scope: source_domain_holdout_only
+
+corruptions:
+  clean:
+    strength_parameter: null
+    monotonic: identity
+    levels:
+      0: {}
+
+  gaussian_noise:
+    strength_parameter: sigma
+    monotonic: increasing
+    levels:
+      1: {sigma: 0.005}
+      2: {sigma: 0.010}
+      3: {sigma: 0.020}
+      4: {sigma: 0.035}
+      5: {sigma: 0.055}
+
+  gaussian_blur:
+    strength_parameter: sigma
+    monotonic: increasing
+    levels:
+      1: {sigma: 0.40}
+      2: {sigma: 0.70}
+      3: {sigma: 1.00}
+      4: {sigma: 1.50}
+      5: {sigma: 2.20}
+
+  low_contrast:
+    # A smaller factor means a stronger contraction toward the per-channel
+    # spatial mean, hence strength is monotonic decreasing in this parameter.
+    strength_parameter: contrast_factor
+    monotonic: decreasing
+    levels:
+      1: {contrast_factor: 0.90}
+      2: {contrast_factor: 0.78}
+      3: {contrast_factor: 0.65}
+      4: {contrast_factor: 0.50}
+      5: {contrast_factor: 0.35}
+
+  stripe_noise:
+    strength_parameter: amplitude
+    monotonic: increasing
+    levels:
+      1: {amplitude: 0.005, smooth_sigma_pixels: 1.5}
+      2: {amplitude: 0.010, smooth_sigma_pixels: 1.5}
+      3: {amplitude: 0.020, smooth_sigma_pixels: 1.5}
+      4: {amplitude: 0.035, smooth_sigma_pixels: 1.5}
+      5: {amplitude: 0.055, smooth_sigma_pixels: 1.5}
