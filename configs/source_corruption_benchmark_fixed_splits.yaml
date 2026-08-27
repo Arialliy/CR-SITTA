@@ -1,0 +1,206 @@
+schema_version: 1
+protocol_id: nsfpn-source-corruption-benchmark-fixed-splits-v1
+created_at: "2026-08-26"
+
+scope:
+  stage: formal_source_corruption_benchmark
+  paper_result: true
+  checkpoint_selection_or_tuning_allowed: false
+  full_fixed_test_split_required: true
+
+source:
+  architecture: MSHNet_NSFPN
+  checkpoint_role: best_miou
+  checkpoint_selection: test_selected
+  checkpoint_disclosure: >-
+    The locked best_miou checkpoints were selected by repeated fixed-test
+    evaluation during epochs 500-1000. This benchmark performs no further
+    checkpoint, corruption, threshold, or hyperparameter selection.
+  parent_training_protocol: configs/retrain_fixed_splits.yaml
+  parent_training_protocol_sha256: 17a194da4a09972906c24ac7bb25d2dd14b0d6fc67ceb1d7b8aff99f1b43c515
+  warm_flag: false
+  batch_size: 1
+
+corruption:
+  seed: 42
+  sample_seed_key: [image_id, corruption, severity, base_seed]
+  severity_table: corruptions/severity_tables.yaml
+  severity_table_sha256: c3218738fd32f2cfa2a24731456d9dc18fa648eb7b0b6e1fbd5175c605ba0536
+  severity_table_frozen: true
+  pilot_protocol_archive: configs/corruption_pilot_fixed_splits_round_02.yaml
+  pilot_protocol_archive_sha256: 62d825a2497da671de2bb6b54d5e85e96992a670404ad07c860a8bdf4ab16c5e
+  pilot_report: results/corruption_pilot_fixed_split/round_02/calibration_report.json
+  pilot_report_sha256: 26e9de24f400a40e36ae461f56bba3a3edab23f6565c32a0dc1a12f17e85951b
+  conditions:
+    clean: [0]
+    gaussian_noise: [1, 3, 5]
+    gaussian_blur: [1, 3, 5]
+    low_contrast: [1, 3, 5]
+    stripe_noise: [1, 3, 5]
+  ordered_conditions:
+    - [clean, 0]
+    - [gaussian_noise, 1]
+    - [gaussian_noise, 3]
+    - [gaussian_noise, 5]
+    - [gaussian_blur, 1]
+    - [gaussian_blur, 3]
+    - [gaussian_blur, 5]
+    - [low_contrast, 1]
+    - [low_contrast, 3]
+    - [low_contrast, 5]
+    - [stripe_noise, 1]
+    - [stripe_noise, 3]
+    - [stripe_noise, 5]
+  condition_count_per_dataset: 13
+
+preprocessing:
+  image_color_space: RGB
+  image_resize: {size: [256, 256], interpolation: bilinear}
+  mask_resize: {size: [256, 256], interpolation: nearest}
+  image_range_before_corruption: [0.0, 1.0]
+  normalization:
+    name: ImageNet
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+    order: after_corruption
+  mask_corrupted: false
+
+materialized_cache:
+  root: results/corruption_cache_fixed_split_v1
+  generation_protocol_archive: configs/source_corruption_cache_generation_v1.yaml
+  generation_protocol_sha256: c8cdd858e293dbad67660869361637b96af34f54c5cfd36ac127d9ee75fad912
+  immutable_after_completion: true
+  overwrite_existing_complete_cache: false
+  build_in_sibling_staging_directory: true
+  publish_with_atomic_directory_rename: true
+  require_complete_sentinel: true
+  independent_regeneration_bit_exact_check: true
+  images:
+    format: numpy_npy
+    dtype: little_endian_float32
+    shape: [N, 3, 256, 256]
+    domain: imagenet_normalized_after_physical_corruption
+    contiguous_order: C
+    one_file_per_condition: true
+  targets:
+    format: numpy_npy
+    dtype: little_endian_float32
+    shape: [N, 1, 256, 256]
+    one_file_per_dataset: true
+  required_hashes:
+    - ordered_ids_sha256
+    - tensor_sequence_sha256
+    - file_sha256
+    - manifest_sha256
+  consumers_must_not_regenerate_corruptions: true
+  consumers_use_read_only_mmap_and_private_sample_copy: true
+  label_firewall: adaptation_receives_image_and_metadata_only
+
+evaluation:
+  probability_transform: sigmoid_once
+  fixed_probability_threshold: 0.5
+  threshold_rule: strict_greater_than
+  froc_probability_thresholds:
+    [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45,
+     0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1.0]
+  foreground_connectivity_2d: 8
+  target_matching:
+    assignment: hungarian_minimum_centroid_distance
+    max_centroid_distance_pixels: 3.0
+    comparison: strict_less_than
+    one_to_one: true
+  report:
+    - legacy_mean_iou
+    - unified_global_iou
+    - pd
+    - fa_per_million_pixels
+    - false_positives_per_image
+    - froc
+
+outputs:
+  root: results/source_corruption_benchmark_fixed_split_v1
+  save_all_binary_prediction_masks: true
+  save_probability_maps: true
+  probability_storage: one_float32_npy_shard_per_condition
+  save_per_image_records: true
+  clean_must_match_existing_source_export: true
+
+clean_parity_gate:
+  run_before_corrupted_conditions: true
+  ordered_ids_exact: true
+  cached_inputs_and_targets_verified_bit_exact_upstream: true
+  probability_arrays_bit_exact: true
+  binary_mask_arrays_bit_exact: true
+  binary_mask_file_hashes_exact: true
+  official_metrics_exact: true
+  unified_metrics_exact: true
+  metric_container_comparison: exact_after_json_tuple_list_canonicalization
+  numeric_tolerance_enabled: false
+  checkpoint_operating_point_exact: true
+  repeat_logits_first_image_bit_exact: true
+  model_state_unchanged: true
+
+datasets:
+  IRSTD-1K:
+    root: datasets/IRSTD-1K
+    test_split: datasets/IRSTD-1K/img_idx/test_IRSTD-1K.txt
+    test_split_sha256: 8c71e474358acb84f2cbebfd1282ffea236f9cb852b7f7c04feb2fd99804c579
+    test_images: 201
+    ordered_test_ids_sha256: 48e0661ba187561d1031b2fa22d4b157fd31e00570775b483b51bb21e1def38b
+    test_source_manifest_sha256: ec4536a2ea4d7c11483c5fca1d4a1225b09314f6d8586f79932b02ff9f0a9cc9
+    test_image_manifest_sha256: dd8e16d88728731d1a1390acb4aa8bf878f48637ab987b5b778cd03de5951159
+    test_mask_manifest_sha256: 63db05498f1be491e90c2f1ccf781e32bf35e7dacc2026bd452babf6b7017471
+    corpus_manifest_sha256: da97df00f1a3bb96d801ff0024d58a3e0c4822844102c65a0657fb6229178edd
+    checkpoint: results/retraining_fixed_split/IRSTD-1K/best_miou.pth.tar
+    checkpoint_sha256: ee8d5c3af67d7c93ff6be25b169bd8fd59afcd776afd173b4e230ad8dc8aa8b2
+    checkpoint_epoch: 535
+    clean_reference: results/source_fixed_split/IRSTD-1K/best_miou
+    clean_reference_metrics_sha256: 51b578111f3bc5edba0a1cf11c516700a47ba2d9586b790a67f64f457c45865e
+    clean_reference_per_image_sha256: a2a17afc73745afed5fb4436211248e0fb5b9e0e767f789b910bb0a6e8f9c8eb
+    materialized_cache:
+      generation_protocol_sha256: c8cdd858e293dbad67660869361637b96af34f54c5cfd36ac127d9ee75fad912
+      manifest_sha256: 84bb406c1b2fdd334026e1a885cd7eacf60de4c43f333fd7fb8f15aacbb12e88
+      content_sha256: 1e65963fa34f801250945d8ae35489eed2fbe738ea80bef394b5ce8650be5c53
+      bytes: 2107639552
+  NUAA-SIRST:
+    root: datasets/NUAA-SIRST
+    test_split: datasets/NUAA-SIRST/img_idx/test_NUAA-SIRST.txt
+    test_split_sha256: e49023203a323c247306b314f23c8b3b917093a26984067792355adff7a8386e
+    test_images: 214
+    ordered_test_ids_sha256: b8a1b96c74306247d56da4abbaf7871619bc2210c710be51816f40002dc5ad1d
+    test_source_manifest_sha256: f93f4f964f5b976759de65f9bb22cecdba1f0e632fbc3f83871cadc266de8c92
+    test_image_manifest_sha256: 5fc7414c811725cefff6668219608b06b491b6de594de18d32c74bdf01f488e9
+    test_mask_manifest_sha256: 5e99c1cff2af040d03b5941d239f262565ed9308a5138cfe7a764d7c2b8318c8
+    corpus_manifest_sha256: a3a5e9579580966c33d20b5544026be5642458efe2c9688bf8ba2bfb6ec56425
+    checkpoint: results/retraining_fixed_split/NUAA-SIRST/best_miou.pth.tar
+    checkpoint_sha256: 23feea50a847cdfc9874fe67d338a3884d9afa75d7a27b9b71a62ff2d00379cf
+    checkpoint_epoch: 981
+    clean_reference: results/source_fixed_split/NUAA-SIRST/best_miou
+    clean_reference_metrics_sha256: 3c85a71d5798f0fcc87cbf992ff0b486322ab442c45912cbffdeb2f1bac323fa
+    clean_reference_per_image_sha256: 8b76148c2a3f2d6087d4d5ab1700cce722417438ef4cc274ce11191bd7bc79f3
+    materialized_cache:
+      generation_protocol_sha256: c8cdd858e293dbad67660869361637b96af34f54c5cfd36ac127d9ee75fad912
+      manifest_sha256: 42444b0b82a093f321c27ed221150fa575e075dff82209271874d5ea6725aa00
+      content_sha256: 14d717269e95548d78de9e85c1a87aa1f293085312ec9604a7b3df60ff32665b
+      bytes: 2243954432
+  NUDT-SIRST:
+    root: datasets/NUDT-SIRST
+    test_split: datasets/NUDT-SIRST/img_idx/test_NUDT-SIRST.txt
+    test_split_sha256: a463c52ee64b1c803c4a322fe090aaf6bc360844898e3943bb7c64a8e551b86e
+    test_images: 664
+    ordered_test_ids_sha256: c1e75c9342a138dfcb90173bae4485a6ac1a172312217f291e1fcead1e9f9f66
+    test_source_manifest_sha256: 7f094142f74ddd2c5632b5d7a925306712cec4b9e08f44947f7637b0e3f4548a
+    test_image_manifest_sha256: f381035999dc2ba8ea137d3042496294549d366525fdd8258ba49905b9f46ac8
+    test_mask_manifest_sha256: 780ed5fd03edf8119e2fef75cacd5583cafb8be7f632cb1bd2263058a49c4ad7
+    corpus_manifest_sha256: 2e97515b4c395be37a931a405a14381090907c1023563e2cd4fea13cad155e32
+    checkpoint: results/retraining_fixed_split/NUDT-SIRST/best_miou.pth.tar
+    checkpoint_sha256: a67d3a7e2597d201e1fecf32b7f218aefa8274ad0443d2726197d84f44d1343e
+    checkpoint_epoch: 812
+    clean_reference: results/source_fixed_split/NUDT-SIRST/best_miou
+    clean_reference_metrics_sha256: 18358e8154beddeb9431267b0bc655ac4dc7c1c2c6a5689f4d87dfad931f395a
+    clean_reference_per_image_sha256: 7f4bd072484e411eb9f3f0628f2c44fa997145f222aa23b61166bf2d007168eb
+    materialized_cache:
+      generation_protocol_sha256: c8cdd858e293dbad67660869361637b96af34f54c5cfd36ac127d9ee75fad912
+      manifest_sha256: 51acd004161c6e3949a8ff1368448e399ba655ccc154aa819864f81676032788
+      content_sha256: 37a1ac48ffa0814b057fd750c5d2e740107533b55b7ab225748552da0bcca555
+      bytes: 6962546432

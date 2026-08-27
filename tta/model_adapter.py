@@ -92,6 +92,40 @@ class IRSTDModelAdapter:
             module.track_running_stats = True
             module.eval()
 
+    def set_adabn_mode(self) -> None:
+        """Use per-image spatial BN statistics without changing any state value.
+
+        The model remains globally in evaluation mode and every learnable
+        parameter stays frozen.  Only ``BatchNorm2d`` modules enter training
+        mode, with running-stat tracking disabled.  PyTorch therefore computes
+        mean/variance from the current ``[1,C,H,W]`` activation while receiving
+        no running buffers to update.  Existing Source buffers are deliberately
+        retained so the episodic state manager can fingerprint and restore them.
+        """
+
+        self.model.eval()
+        for parameter in self.model.parameters():
+            parameter.requires_grad_(False)
+
+        batchnorm_count = 0
+        for module in self.model.modules():
+            if not isinstance(module, nn.BatchNorm2d):
+                continue
+            batchnorm_count += 1
+            if (
+                module.running_mean is None
+                or module.running_var is None
+                or module.num_batches_tracked is None
+            ):
+                raise ValueError(
+                    "episodic AdaBN requires intact Source running-stat buffers"
+                )
+            module.train()
+            module.track_running_stats = False
+
+        if batchnorm_count == 0:
+            raise ValueError("episodic AdaBN requires at least one BatchNorm2d")
+
     def set_tent_mode(self, use_batch_stats: bool) -> None:
         """Enable only BN affine gradients under one of the frozen BN protocols.
 

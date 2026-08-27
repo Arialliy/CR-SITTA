@@ -1,0 +1,81 @@
+schema_version: 1
+
+# Provisional shared physical-domain strengths for the fixed-split Pilot.
+# The numeric values may be changed only from evidence on the deterministic
+# 64-image subsets of datasets/*/img_idx/train_<dataset>.txt.  They must be
+# frozen before any full-test corruption benchmark is run.
+status: fixed_split_v1_round2_candidate_pending_train_pilot
+frozen: false
+calibration:
+  required: true
+  completed: false
+  scope: fixed_train_sha256_ranked_64_per_dataset_no_test_images_or_labels
+  protocol: clean_plus_4_corruptions_x_5_severities_seed_42
+  shared_across_datasets: true
+  evidence:
+    round_1:
+      protocol_sha256: 7bc5aac7d31990c4a59e7430f7f74e67ff89f938355139956e0d60421b9824bb
+      severity_table_sha256: b30a607d015a517c18a3673cf4607dac732c8ad3119b9faf1b4be3bda1ad8080
+      results_root: results/corruption_pilot_fixed_split
+      calibration_report: results/corruption_pilot_fixed_split/calibration_report.json
+      calibration_report_sha256: 96197cb27fc74545f1c7f83324dfe5dca1760d2fa94f76b42fecee3789ea5ca3
+      decision: adjust_and_rerun_pilot
+      findings:
+        gaussian_noise: NUDT-SIRST_S5_collapsed
+        gaussian_blur: passed_all_three_datasets
+        low_contrast: S5_too_weak_on_IRSTD-1K_and_NUDT-SIRST
+        stripe_noise: S5_too_weak_on_IRSTD-1K_and_NUDT-SIRST
+    round_2_candidate_rationale:
+      gaussian_noise: reduce_high_severities_to_avoid_NUDT-SIRST_S5_collapse
+      gaussian_blur: unchanged_after_round_1_pass
+      low_contrast: strengthen_S4_S5
+      stripe_noise: strengthen_S2_S5
+
+corruptions:
+  clean:
+    strength_parameter: null
+    monotonic: identity
+    levels:
+      0: {}
+
+  gaussian_noise:
+    strength_parameter: sigma
+    monotonic: increasing
+    levels:
+      1: {sigma: 0.005}
+      2: {sigma: 0.010}
+      3: {sigma: 0.014}
+      4: {sigma: 0.018}
+      5: {sigma: 0.023}
+
+  gaussian_blur:
+    strength_parameter: sigma
+    monotonic: increasing
+    levels:
+      1: {sigma: 0.40}
+      2: {sigma: 0.70}
+      3: {sigma: 1.00}
+      4: {sigma: 1.50}
+      5: {sigma: 2.20}
+
+  low_contrast:
+    # A smaller factor means a stronger contraction toward the per-channel
+    # spatial mean, hence strength is monotonic decreasing in this parameter.
+    strength_parameter: contrast_factor
+    monotonic: decreasing
+    levels:
+      1: {contrast_factor: 0.90}
+      2: {contrast_factor: 0.78}
+      3: {contrast_factor: 0.65}
+      4: {contrast_factor: 0.45}
+      5: {contrast_factor: 0.25}
+
+  stripe_noise:
+    strength_parameter: amplitude
+    monotonic: increasing
+    levels:
+      1: {amplitude: 0.005, smooth_sigma_pixels: 1.5}
+      2: {amplitude: 0.015, smooth_sigma_pixels: 1.5}
+      3: {amplitude: 0.035, smooth_sigma_pixels: 1.5}
+      4: {amplitude: 0.065, smooth_sigma_pixels: 1.5}
+      5: {amplitude: 0.100, smooth_sigma_pixels: 1.5}

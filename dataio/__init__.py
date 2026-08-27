@@ -1,4 +1,4 @@
-"""Dataset interfaces for reproducible CR-SITTA evaluation."""
+"""Shared data-entry helpers for fixed-split NS-FPN experiments."""
 
 from .research_dataset import (
     CorruptionTransform,

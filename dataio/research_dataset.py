@@ -1,17 +1,17 @@
-"""Standardised, metadata-rich test dataset for CR-SITTA experiments.
+"""Metadata-rich NS-FPN evaluation dataset for clean and corrupted inputs.
 
-The dataset deliberately requires an explicit split file and resolves either
-the official ``img/label`` layout or the common ``images/masks`` layout.  It
-does not import a corruption implementation.  Instead, callers may inject a
-callable with this positional signature::
+The split is always explicit.  Images are converted to RGB, image and mask are
+resized independently to the frozen network grid, and ImageNet normalisation
+is applied only after an optional physical-domain corruption.  This preserves
+the preprocessing used by the completed fixed-split NS-FPN training run while
+exposing stable metadata for Source/TTA evaluation.
+
+An injected corruption has the signature::
 
     transform(image_01, corruption, severity, rng) -> image_01
 
-``image_01`` is an ``H x W x 3`` RGB NumPy array in the physical intensity
-range ``[0, 1]``.  The callable must return a finite array with the same shape
-and range.  ``rng`` is deterministically derived from ``(image_id,
-corruption, severity, seed)``.  The transform runs after spatial resizing and
-before ImageNet normalisation.
+``image_01`` is an ``H x W x 3`` float array in ``[0, 1]``.  The per-sample
+generator is derived from ``(image_id, corruption, severity, seed)``.
 """
 
 from __future__ import annotations
@@ -43,8 +43,6 @@ IMAGENET_STD = np.asarray((0.229, 0.224, 0.225), dtype=np.float32)
 
 
 class CorruptionTransform(Protocol):
-    """Injected physical-domain transform; no concrete corruption API assumed."""
-
     def __call__(
         self,
         image_01: NDArray[np.float32],
@@ -52,6 +50,13 @@ class CorruptionTransform(Protocol):
         severity: int,
         rng: np.random.Generator,
     ) -> Any:
+        ...
+
+
+class IOAccessGuard(Protocol):
+    """Validate and record a sample file immediately before pixel I/O."""
+
+    def __call__(self, role: str, image_id: str, path: Path) -> None:
         ...
 
 
@@ -82,7 +87,7 @@ def _normalise_identifier(raw_identifier: str, *, line_number: int) -> str:
 
 
 def read_split_ids(split_file: Union[str, Path]) -> Tuple[str, ...]:
-    """Read non-blank IDs from an explicit split file and reject duplicates."""
+    """Read an explicit UTF-8 split, preserving order and rejecting duplicates."""
 
     split_path = Path(split_file).expanduser()
     if not split_path.is_file():
@@ -110,7 +115,7 @@ def read_split_ids(split_file: Union[str, Path]) -> Tuple[str, ...]:
 
 
 def resolve_dataset_layout(dataset_root: Union[str, Path]) -> DatasetLayout:
-    """Resolve exactly one supported image/mask directory pair."""
+    """Resolve one unambiguous ``img/label`` or ``images/masks`` layout."""
 
     root = Path(dataset_root).expanduser()
     if not root.is_dir():
@@ -214,15 +219,6 @@ def _validate_protocol_metadata(corruption: str, severity: int, seed: int) -> No
         raise ValueError("seed must be an integer in [0, 2**64).")
 
 
-def _sample_rng(
-    image_id: str,
-    corruption: str,
-    severity: int,
-    seed: int,
-) -> np.random.Generator:
-    return make_sample_rng(image_id, corruption, severity, seed)
-
-
 def _validate_physical_image(
     image: Any,
     *,
@@ -231,9 +227,7 @@ def _validate_physical_image(
 ) -> NDArray[np.float32]:
     array = np.asarray(image)
     if array.shape != expected_shape:
-        raise ValueError(
-            f"{source} must return shape {expected_shape}, got {array.shape}."
-        )
+        raise ValueError(f"{source} must return shape {expected_shape}, got {array.shape}.")
     if not np.issubdtype(array.dtype, np.number):
         raise TypeError(f"{source} must return a numeric array.")
     array = array.astype(np.float32, copy=False)
@@ -249,7 +243,7 @@ def _validate_physical_image(
 
 
 class IRSTDResearchDataset(Dataset):
-    """Deterministic evaluation dataset with a standard CR-SITTA sample dict."""
+    """Deterministic fixed-split evaluation dataset with stable metadata."""
 
     def __init__(
         self,
@@ -262,6 +256,7 @@ class IRSTDResearchDataset(Dataset):
         severity: int = 0,
         seed: int = 42,
         corruption_transform: CorruptionTransform | None = None,
+        io_access_guard: IOAccessGuard | None = None,
         extensions: Sequence[str] = DEFAULT_EXTENSIONS,
     ) -> None:
         root = Path(dataset_root).expanduser()
@@ -278,6 +273,8 @@ class IRSTDResearchDataset(Dataset):
             raise ValueError("dataset_name must be a non-empty string.")
         if corruption_transform is not None and not callable(corruption_transform):
             raise TypeError("corruption_transform must be callable or None.")
+        if io_access_guard is not None and not callable(io_access_guard):
+            raise TypeError("io_access_guard must be callable or None.")
         if corruption != "clean" and corruption_transform is None:
             raise ValueError(
                 "a non-clean corruption requires corruption_transform; refusing "
@@ -287,6 +284,7 @@ class IRSTDResearchDataset(Dataset):
         self.severity = int(severity)
         self.seed = int(seed)
         self.corruption_transform = corruption_transform
+        self.io_access_guard = io_access_guard
         self.extensions = _normalise_extensions(extensions)
 
         records = []
@@ -335,29 +333,27 @@ class IRSTDResearchDataset(Dataset):
 
     def __getitem__(self, index: int) -> Dict[str, Any]:
         record = self._records[index]
+        output_height, output_width = self.output_size
+
+        if self.io_access_guard is not None:
+            self.io_access_guard("image", record.image_id, record.image_path.resolve())
         with Image.open(record.image_path) as image_handle:
             image = image_handle.convert("RGB")
             original_width, original_height = image.size
-            output_height, output_width = self.output_size
             resized_image = image.resize(
                 (output_width, output_height), resample=Image.Resampling.BILINEAR
             )
             image_01 = np.asarray(resized_image, dtype=np.float32) / 255.0
 
+        if self.io_access_guard is not None:
+            self.io_access_guard("mask", record.image_id, record.mask_path.resolve())
         with Image.open(record.mask_path) as mask_handle:
             mask = mask_handle.convert("L")
-            # Resize image and mask independently, matching the official loader.
-            # NUAA-SIRST/Misc_111 is a known upstream sample whose source image
-            # and annotation dimensions differ, although both map to the same
-            # frozen 256 x 256 evaluation grid.
             resized_mask = mask.resize(
                 (output_width, output_height), resample=Image.Resampling.NEAREST
             )
-            # Preserve the official ToTensor mask values in [0,1].  Most masks
-            # are exactly binary, but IRSTD-1K contains a handful of non-255
-            # boundary pixels whose legacy mIoU semantics must remain visible
-            # to OfficialMetricAdapter.  UnifiedResearchEvaluator owns its own
-            # explicit target binarisation rule.
+            # Keep legacy ToTensor semantics.  Some masks contain non-255
+            # boundary values and metric code owns the foreground rule.
             mask_01 = np.asarray(resized_mask, dtype=np.float32) / 255.0
 
         expected_shape = (output_height, output_width, 3)
@@ -365,7 +361,7 @@ class IRSTDResearchDataset(Dataset):
             image_01, expected_shape=expected_shape, source="loaded image"
         )
         if self.corruption_transform is not None:
-            rng = _sample_rng(
+            rng = make_sample_rng(
                 record.image_id,
                 self.corruption,
                 self.severity,
@@ -387,7 +383,6 @@ class IRSTDResearchDataset(Dataset):
         mask_tensor = torch.from_numpy(
             np.ascontiguousarray(mask_01[None, ...], dtype=np.float32)
         )
-
         return {
             "image": image_tensor,
             "mask": mask_tensor,
@@ -406,6 +401,7 @@ __all__ = [
     "DatasetLayout",
     "IMAGENET_MEAN",
     "IMAGENET_STD",
+    "IOAccessGuard",
     "IRSTDResearchDataset",
     "read_split_ids",
     "resolve_dataset_layout",

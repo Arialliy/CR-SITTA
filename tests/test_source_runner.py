@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import subprocess
 import sys
 from types import SimpleNamespace
 
@@ -24,7 +25,26 @@ class FakeNSFPN(nn.Module):
 
 
 def test_runner_import_does_not_import_real_nsfpn_model() -> None:
-    assert "model.MSHNet_NSFPN" not in sys.modules
+    # Check import laziness in a clean interpreter.  Other tests legitimately
+    # construct the real model, so the parent process' module cache is not a
+    # valid oracle and made this test depend on collection/execution order.
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys; "
+                "assert 'model.MSHNet_NSFPN' not in sys.modules; "
+                "import test_source; "
+                "assert 'model.MSHNet_NSFPN' not in sys.modules"
+            ),
+        ],
+        cwd=source_runner.PROJECT_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 @pytest.mark.parametrize("wrapper", [None, "state_dict", "net"])

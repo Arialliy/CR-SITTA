@@ -1,0 +1,46 @@
+schema_version: 1
+criteria_id: nsfpn-corruption-pilot-acceptance-v1
+scope: fixed_train_64_image_pilot_only
+
+difficulty_score:
+  formula: 0.65*relative_iou_drop + 0.35*relative_pd_drop
+  relative_drop_clip: [-1.0, 1.0]
+  false_alarm_role: diagnostic_only
+
+hard_validity:
+  require_finite_metrics: true
+  require_same_protocol_hash_across_datasets: true
+  require_same_severity_hash_across_datasets: true
+  require_formal_contract: true
+  require_exact_input_reproduction: true
+  require_identical_gt_masks: true
+  require_identical_ordered_ids: true
+  require_model_state_unchanged: true
+  require_clean_transform_identity: true
+  require_zero_test_image_and_mask_opens: true
+
+per_dataset_corruption:
+  s1_max_absolute_iou_drop: 0.05
+  s1_max_absolute_pd_drop: 0.05
+  upper_tier_min_difficulty_margin_over_lower_tier: 0.10
+  upper_tier_definition: mean_D_S4_S5
+  lower_tier_definition: mean_D_S1_S2
+  s5_min_difficulty_score: 0.15
+  s5_min_relative_degradation: 0.15
+  s5_min_iou_absolute: 0.10
+  s5_min_iou_fraction_of_clean: 0.20
+  s5_min_pd_absolute: 0.20
+  s5_min_pd_fraction_of_clean: 0.25
+  spearman_warning_below: 0.60
+  adjacent_difficulty_reversal_warning_above: 0.03
+
+shared_table:
+  min_dataset_passes_per_corruption: 2
+  require_no_s5_collapse_in_any_dataset: true
+  require_all_corruptions_to_freeze: true
+
+interpretation:
+  s5_language: non_saturated_and_signal_retaining
+  recoverability_claim: >-
+    Source-only Pilot metrics cannot establish recoverability. Actual
+    recoverability requires a later oracle or upper-bound adaptation study.

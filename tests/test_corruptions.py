@@ -33,15 +33,15 @@ def _layout_cases() -> tuple[np.ndarray, ...]:
     )
 
 
-def test_shipped_table_is_source_calibrated_frozen_and_complete() -> None:
+def test_shipped_table_is_fixed_split_pilot_frozen_and_complete() -> None:
     table = get_default_severity_table()
 
-    assert table.status == "engineering_v1_frozen_after_source_trainval_pilot"
+    assert table.status == "fixed_split_v1_frozen_after_round2_train_pilot"
     assert table.frozen is True
     assert table.calibration_required is True
     assert table.calibration_completed is True
     assert table.calibration_scope == (
-        "source_domain_official_trainval_subset_only_no_target_test_ids"
+        "fixed_train_sha256_ranked_64_per_dataset_no_test_images_or_labels"
     )
     assert set(table.levels) == set(SUPPORTED_CORRUPTIONS)
     assert set(table.levels["clean"]) == {0}

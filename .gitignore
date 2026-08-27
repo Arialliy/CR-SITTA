@@ -210,11 +210,23 @@ weights/*.pth
 weights/*.pt
 results/**
 !results/.gitkeep
+!results/README.md
 configs/local_paths.yaml
 third_party/*
 !third_party/.gitkeep
+!third_party/tent_reference.json
+!third_party/binary_tent_reference_v1.json
 dataset/*/img
 dataset/*/label
+
+# Keep dataset split manifests, but never publish local images or masks.
+/datasets/**
+!/datasets/*/
+!/datasets/*/img_idx/
+!/datasets/*/img_idx/*.txt
+
+# Finder metadata can appear anywhere in locally mounted datasets.
+.DS_Store
 
 # Marimo
 marimo/_static/

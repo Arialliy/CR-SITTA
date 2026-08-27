@@ -1,0 +1,131 @@
+schema_version: 1
+execution_protocol_id: cr-sitta-binary-tent-source-calibration-execution-v1
+created_at: "2026-08-27"
+
+scientific_protocol:
+  path: configs/binary_tent_source_calibration_v1.yaml
+  sha256: 4c9c57def0fea69ed83f88d6abc31d83988d2e7d0dace35a94c2e9defe2baf8d
+
+cache_protocol:
+  path: configs/binary_tent_source_calibration_cache_v1.yaml
+  sha256: 8ee2d76b5472287a427ecce25a02ccde1de880bb4770c77dafdcf34199e1b630
+  root: results/binary_tent/source_calibration_cache_v1
+  require_complete_sentinel: true
+  verify_every_manifest_file_sha256_at_process_entry: true
+  consumer_mode: read_only_numpy_mmap_with_private_image_copy
+  target_access: outer_evaluator_after_episode_return_only
+
+execution:
+  seed: 42
+  batch_size: 1
+  num_workers: 0
+  image_size: 256
+  amp_enabled: false
+  device_type: cuda
+  visible_cuda_devices_per_worker: 1
+  deterministic_forwards:
+    algorithms_enabled: true
+    warn_only: false
+    cudnn_deterministic: true
+    cudnn_benchmark: false
+    cublas_workspace_config: ":4096:8"
+  entropy_backward:
+    deterministic_algorithms: temporarily_disabled
+    restore_strict_policy_before_optimizer_step_and_post_forward: true
+  full_state_sha256_audit_cadence: 64
+  force_full_audit_at_every_cell_end: true
+  rebuild_model_method_optimizer_per_dataset_protocol: true
+  candidate_order_stage1: optimizer_major_then_learning_rate
+  stage2_candidate_order: frozen_stage1_top3
+  reapply_fixed_seed_before_every_candidate: true
+
+launcher:
+  default_physical_gpu_ids: [1, 2]
+  one_live_worker_per_physical_gpu: true
+  reuse_only_the_slot_whose_worker_completed: true
+  failure_termination_timeout_seconds: 10
+  failure_cleanup: terminate_then_timeout_kill_then_wait_every_live_worker
+  stage1:
+    one_candidate_per_fresh_process: true
+    maximum_parallel_workers: 2
+    episodes_per_process: 4992
+    safe_resume_current_runtime_seal_only: true
+    missing_candidate_shard_action: run
+    valid_current_seal_candidate_shard_action: skip
+    invalid_or_old_seal_candidate_shard_action: fail_closed_without_delete
+  stage2:
+    fresh_process_count: 2
+    each_process_runs_all_top3_sequentially: true
+    episodes_per_process: 14976
+    top3_receipt: stage1/aggregate/stage1_top3_receipt.json
+    verify_stage1_aggregate_before_receipt_use: true
+    bind_receipt_in_process_entry_runtime_seal: true
+
+gpu_smoke:
+  publishes_formal_output: false
+  fixed_dataset: IRSTD-1K
+  fixed_condition: [clean, 0]
+  fixed_optimizer: Adam
+  fixed_learning_rate: 1.0e-5
+  default_episodes_per_bn_protocol: 1
+  optional_full_cell_episodes_per_bn_protocol: 64
+  bn_protocols:
+    - single_image_spatial_batch_stats
+    - source_running_statistics
+
+runtime_seal:
+  algorithm: calibration-runtime-seal-v1
+  full_byte_hash_at_process_entry: true
+  cache_payload_process_entry_access: opaque_byte_hash_without_numpy_load
+  parent_pilot_artifact_manifest_complete_bound: true
+  source_train_and_test_split_files_bound: true
+  stage2_top3_receipt_bound_with_canonical_role: stage1_top3_receipt
+  full_byte_hash_before_publish: true
+  every_condition:
+    verify_all_bound_file_identity_and_metadata: true
+    rehash_small_protocol_and_code_files: true
+    rehash_active_condition_cache_file: true
+    verify_outer_target_file_identity_without_loading_tensor: true
+    rehash_outer_target_cache_file_only_after_method_episodes_complete: true
+  critical_code_paths:
+    - run_binary_tent_source_calibration.py
+    - materialize_binary_tent_source_calibration_cache.py
+    - tta/binary_tent_fast_runner.py
+    - tta/binary_tent_calibration_selector.py
+    - tta/binary_tent.py
+    - tta/adabn_fast_runner.py
+    - tta/state_manager.py
+    - tta/model_adapter.py
+    - tta/episodic_runner.py
+    - metrics/irstd_metrics.py
+    - metrics/connected_components.py
+    - metrics/target_matching.py
+    - dataio/corruption_cache.py
+    - model/MSHNet_NSFPN.py
+    - model/NS_FPN.py
+    - model/diff_cross_attns.py
+    - test_source.py
+
+evaluation:
+  evaluator: metrics.irstd_metrics.UnifiedResearchEvaluator
+  froc_probability_thresholds: [0.5]
+  fixed_probability_threshold: 0.5
+  threshold_rule: strict_greater_than
+  retain_only_integer_sufficient_statistics: true
+  target_transition_fields_forbidden: true
+  entropy_hard_gate: false
+  performance_hard_gate: false
+
+outputs:
+  root: results/binary_tent/source_calibration_v1
+  refuse_overwrite: true
+  atomic_sibling_staging: true
+  shard_manifest: artifact_manifest.json
+  shard_complete: COMPLETE.json
+  records_filename: records.jsonl
+  stage1_aggregate_directory: stage1/aggregate
+  stage2_aggregate_directory: final/aggregate
+  provenance_scope:
+    paper_result: false
+    source_train_derived: true
+  inherited_source_limitation_required: true

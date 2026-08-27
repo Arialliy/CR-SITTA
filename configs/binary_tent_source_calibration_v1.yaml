@@ -1,0 +1,255 @@
+schema_version: 1
+protocol_id: cr-sitta-binary-tent-source-calibration-v1
+created_at: "2026-08-27"
+
+scope:
+  stage: source_domain_optimizer_learning_rate_calibration
+  purpose: select_one_shared_optimizer_and_learning_rate_for_binary_episodic_tent
+  paper_result: false
+  scientific_result_frozen: false
+  source_train_derived: true
+  independent_validation: false
+  disclosure: >-
+    This is a source-train-derived calibration experiment on fixed 64-image
+    subsets. It is not an independent validation set and its condition metrics
+    are not paper benchmark results.
+  use_test_images: false
+  use_test_labels: false
+  test_split_metadata_use: leakage_guard_only
+  train_labels_outer_evaluator_only: true
+  method_receives_labels: false
+  target_transition_metrics_used_for_selection: false
+  entropy_decrease_required: false
+  arbitrary_performance_hard_thresholds: false
+
+inherited_source_limitation:
+  checkpoint_role: best_miou
+  checkpoint_selection: test_selected_during_source_training
+  disclosure: >-
+    The locked best_miou source checkpoints were selected by repeated fixed-test
+    evaluation during epochs 500-1000. This calibration adds no new test access,
+    but it does not repair that inherited checkpoint-level test-selection
+    limitation.
+  parent_training_protocol: configs/retrain_fixed_splits.yaml
+  parent_training_protocol_sha256: 17a194da4a09972906c24ac7bb25d2dd14b0d6fc67ceb1d7b8aff99f1b43c515
+
+source_train_subsets:
+  subset_size_per_dataset: 64
+  selection: ascending_sha256_of_utf8_canonical_image_id
+  source: frozen_round_02_corruption_pilot_ids
+  pilot_protocol: configs/corruption_pilot_fixed_splits_round_02.yaml
+  pilot_protocol_sha256: 62d825a2497da671de2bb6b54d5e85e96992a670404ad07c860a8bdf4ab16c5e
+  zero_overlap_with_fixed_test_ids_required: true
+  datasets:
+    IRSTD-1K:
+      train_split: datasets/IRSTD-1K/img_idx/train_IRSTD-1K.txt
+      train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+      ordered_ids_sha256: 09a27c1d085bb5816da442fbcd50998b9716d757ad9cc914d86e75d9ea0978d6
+      checkpoint: results/retraining_fixed_split/IRSTD-1K/best_miou.pth.tar
+      checkpoint_sha256: ee8d5c3af67d7c93ff6be25b169bd8fd59afcd776afd173b4e230ad8dc8aa8b2
+    NUAA-SIRST:
+      train_split: datasets/NUAA-SIRST/img_idx/train_NUAA-SIRST.txt
+      train_split_sha256: 324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4
+      ordered_ids_sha256: 97c12e4fccb20c9a8df2a3c4c5d57ba3ebd3b6bef636a51d0af3a503334ba346
+      checkpoint: results/retraining_fixed_split/NUAA-SIRST/best_miou.pth.tar
+      checkpoint_sha256: 23feea50a847cdfc9874fe67d338a3884d9afa75d7a27b9b71a62ff2d00379cf
+    NUDT-SIRST:
+      train_split: datasets/NUDT-SIRST/img_idx/train_NUDT-SIRST.txt
+      train_split_sha256: e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3
+      ordered_ids_sha256: 19cab65e6d89fd2861f00f04f985ea5e293e7b8924cd6077f1f13983379e9dfb
+      checkpoint: results/retraining_fixed_split/NUDT-SIRST/best_miou.pth.tar
+      checkpoint_sha256: a67d3a7e2597d201e1fecf32b7f218aefa8274ad0443d2726197d84f44d1343e
+
+corruption_conditions:
+  base_seed: 42
+  severity_table: corruptions/severity_tables.yaml
+  severity_table_sha256: c3218738fd32f2cfa2a24731456d9dc18fa648eb7b0b6e1fbd5175c605ba0536
+  severity_table_frozen: true
+  sample_seed_key: [image_id, corruption, severity, base_seed]
+  count_per_dataset: 13
+  ordered:
+    - [clean, 0]
+    - [gaussian_noise, 1]
+    - [gaussian_noise, 3]
+    - [gaussian_noise, 5]
+    - [gaussian_blur, 1]
+    - [gaussian_blur, 3]
+    - [gaussian_blur, 5]
+    - [low_contrast, 1]
+    - [low_contrast, 3]
+    - [low_contrast, 5]
+    - [stripe_noise, 1]
+    - [stripe_noise, 3]
+    - [stripe_noise, 5]
+
+method:
+  name: Binary Episodic TENT
+  implementation: tta/binary_tent.py
+  selector: tta/binary_tent_calibration_selector.py
+  optimizer_steps_per_image: 1
+  amp_enabled: false
+  adaptable_parameters: batchnorm2d_affine_only
+  loss: full_image_mean_binary_sigmoid_entropy
+  entropy_eps: 1.0e-6
+  bn_protocols:
+    ordered:
+      - single_image_spatial_batch_stats
+      - source_running_statistics
+    both_retained_for_formal_experiments: true
+    protocol_selection_or_elimination_allowed: false
+  candidates:
+    shared_optimizer_and_lr_across_both_bn_protocols: true
+    optimizer_order: [Adam, SGD]
+    learning_rates: [1.0e-5, 3.0e-5, 1.0e-4, 3.0e-4, 1.0e-3]
+    cross_product_count: 10
+    Adam:
+      betas: [0.9, 0.999]
+      eps: 1.0e-8
+      weight_decay: 0.0
+      amsgrad: false
+      foreach: false
+      maximize: false
+      capturable: false
+      differentiable: false
+      fused: false
+    SGD:
+      momentum: 0.9
+      dampening: 0.0
+      weight_decay: 0.0
+      nesterov: true
+      maximize: false
+      foreach: false
+      differentiable: false
+
+evaluation:
+  probability_transform: sigmoid_once
+  fixed_probability_threshold: 0.5
+  threshold_rule: strict_greater_than
+  target_transition_metrics_used_for_selection: false
+  selector_cell: dataset_x_bn_protocol_x_condition
+  cells_per_candidate_run: 78
+  cell_sufficient_statistics:
+    - intersection_pixels
+    - union_pixels
+    - false_alarm_pixels
+    - total_image_pixels
+    - detected_targets
+    - total_targets
+  formulas:
+    global_iou: intersection_pixels / union_pixels
+    cell_global_iou_delta: tent_post_global_iou - protocol_matched_tent_pre_global_iou
+    fa_per_million_pixels: false_alarm_pixels / total_image_pixels * 1000000
+    cell_fa_increase: tent_post_fa_per_million_pixels - tent_pre_fa_per_million_pixels
+    pd: detected_targets / total_targets
+    cell_pd_delta: tent_post_pd - tent_pre_pd
+    within_run_macro: arithmetic_mean_over_78_cells_with_weight_1_over_78_each
+    clean_macro: arithmetic_mean_over_clean_cells_for_3_datasets_x_2_bn_protocols
+    across_run_macro: arithmetic_mean_over_3_fresh_process_runs_with_weight_1_over_3_each
+  selector_recomputes_metrics_from_integer_counts: true
+  all_fraction_numerators_and_denominators_saved_in_receipt: true
+  forbidden_selector_inputs:
+    - ATER
+    - ATRR
+    - NTG
+    - target_erasure
+    - target_recovery
+    - target_transitions
+  target_level_analysis_timing: only_after_final_optimizer_lr_receipt_is_complete
+
+selection:
+  stage_1:
+    candidates: 10
+    runs_per_candidate: 1
+    datasets: 3
+    images_per_dataset: 64
+    conditions: 13
+    bn_protocols: 2
+    episodes: 49920
+    output: deterministic_top_3_shared_optimizer_lr_candidates
+  stage_2:
+    candidates: 3
+    additional_fresh_processes_per_candidate: 2
+    shared_fresh_process_count: 2
+    same_two_process_ids_each_run_all_top3_candidates: true
+    process_ids_disjoint_from_stage_1: true
+    candidate_execution_inside_each_process: sequential_in_frozen_top3_order
+    rebuild_model_method_optimizer_before_each_candidate: true
+    verify_global_runtime_seal_before_and_after_each_candidate: true
+    reapply_and_verify_fixed_seed_before_each_candidate: true
+    datasets: 3
+    images_per_dataset: 64
+    conditions: 13
+    bn_protocols: 2
+    episodes: 29952
+  total_episodes: 79872
+  final_runs_per_top3_candidate: 3
+  select_exactly_one_shared_optimizer_lr: true
+  tie_break_order:
+    - higher_mean_over_3_runs_macro_global_iou_delta
+    - higher_worst_run_macro_global_iou_delta
+    - higher_clean_mean_over_3_runs_macro_global_iou_delta
+    - lower_mean_over_3_runs_macro_fa_increase_per_million_pixels
+    - higher_mean_over_3_runs_macro_pd_delta
+    - lower_learning_rate
+    - fixed_optimizer_order_Adam_then_SGD
+  no_numeric_rounding_before_ranking: true
+  exact_rational_arithmetic_from_integer_counts: true
+
+required_hard_gates:
+  exact_set_no_additional_performance_gates_allowed:
+    - implementation_protocol_valid
+    - exact_reset
+    - label_firewall
+    - finite_values
+    - exactly_one_optimizer_step_per_episode
+    - source_pre_identity_contract
+    - tent_pre_identity_contract
+    - zero_test_opens
+  direct_audit_counters:
+    optimizer_steps_total_equals_image_count: true
+    method_label_accesses: 0
+    test_image_opens: 0
+    test_label_opens: 0
+  entropy_decreased_gate: false
+  target_transition_gate: false
+  minimum_iou_or_pd_gate: false
+  maximum_fa_or_update_norm_gate: false
+  implementation_protocol_audit_under_implementation_protocol_valid:
+    candidate_model_method_optimizer_rebuilt_before_run: true
+    global_runtime_seal_valid: true
+    fixed_seed_contract_valid: true
+
+record_contract:
+  one_record_per_candidate_process_dataset_protocol_condition: true
+  image_count_per_record: 64
+  required_fields:
+    - stage
+    - process_id
+    - fresh_process
+    - candidate
+    - dataset
+    - bn_protocol
+    - corruption
+    - severity
+    - image_count
+    - optimizer_steps_total
+    - test_image_opens
+    - test_label_opens
+    - method_label_accesses
+    - hard_gates
+    - protocol_audit
+    - endpoints.tent_pre
+    - endpoints.tent_post
+  duplicate_cells_rejected: true
+  missing_cells_rejected: true
+  unsupported_candidates_rejected: true
+  nonfinite_or_invalid_counts_rejected: true
+
+outputs:
+  root: results/binary_tent/source_calibration_v1
+  stage1_receipt: stage1_top3_receipt.json
+  final_receipt: final_selection_receipt.json
+  paper_result: false
+  refuse_overwrite: true
+  atomic_sibling_staging: true
+  selector_module_performs_file_writes: false

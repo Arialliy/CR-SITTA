@@ -1,0 +1,220 @@
+schema_version: 1
+protocol_id: cr-sitta-binary-tent-source-calibration-cache-v1
+created_at: "2026-08-27"
+
+scope:
+  stage: source_train_derived_hyperparameter_calibration_input_cache
+  purpose: materialize_shared_binary_tent_optimizer_lr_calibration_inputs
+  paper_result: false
+  independent_validation_set: false
+  use_test_images: false
+  use_test_labels: false
+  test_split_metadata_for_leakage_guard_only: true
+  adaptation_interface_invoked: false
+  adaptation_receives_labels: false
+  targets_role: outer_source_side_calibration_evaluator_only
+  target_transition_hyperparameter_selection_allowed: false
+
+source:
+  architecture: MSHNet_NSFPN
+  checkpoint_role: best_miou
+  checkpoint_selection: test_selected
+  checkpoint_disclosure: >-
+    The locked best_miou checkpoints were selected by repeated evaluation of
+    the fixed test split during source training. This train-derived cache adds
+    no test-image or test-label access and performs no model selection.
+  parent_training_protocol: configs/retrain_fixed_splits.yaml
+  parent_training_protocol_sha256: 17a194da4a09972906c24ac7bb25d2dd14b0d6fc67ceb1d7b8aff99f1b43c515
+  warm_flag: false
+  batch_size: 1
+
+provenance_chain:
+  source_corruption_protocol:
+    path: configs/source_corruption_benchmark_fixed_splits.yaml
+    sha256: de0f5434a05486d7dba0179c3cee987c68bb14a55c16042a678b47195644c784
+  round_02_pilot_protocol:
+    path: configs/corruption_pilot_fixed_splits_round_02.yaml
+    sha256: 62d825a2497da671de2bb6b54d5e85e96992a670404ad07c860a8bdf4ab16c5e
+  round_02_pilot_report:
+    path: results/corruption_pilot_fixed_split/round_02/calibration_report.json
+    sha256: 26e9de24f400a40e36ae461f56bba3a3edab23f6565c32a0dc1a12f17e85951b
+  round_02_candidate_severity_table:
+    path: corruptions/severity_tables_round_02_candidate.yaml
+    sha256: 40a5ff585f02b94b43512377205db17b002f622a8717227acd9486602c42e33f
+  frozen_severity_table:
+    path: corruptions/severity_tables.yaml
+    sha256: c3218738fd32f2cfa2a24731456d9dc18fa648eb7b0b6e1fbd5175c605ba0536
+  input_pipeline_files:
+    dataio/research_dataset.py: f6fd667d944ade5be6fefa8cb4ec2099d3ecf177caa65372ebca04e2f9abf915
+    corruptions/corruption_protocol.py: af466bb7fa13eea1758f68b038bef2f82b02dff67f4371a2eff099acce1bcc12
+    corruptions/infrared_corruptions.py: 616f250c286abaa56054bc03d2af6096507ca2202e7597cdb3984dd933d5d1f6
+    dataio/corruption_cache.py: 8e5c92c7a82149b29221f8bd8a0708714e6e9f9a999e21de4ff78d1c35e80017
+    run_corruption_pilot.py: 42603f81f3aa10b1b04ac1810782f873a6c7361ba759f07bfbd12bad76c99bf1
+    test_source.py: 76f2737d0c3e01b0eeac3ad5398d67460bb7ab014ec703449653e8aec729a13c
+
+input_protocol:
+  subset_size_per_dataset: 64
+  subset_role: fixed_train_derived_calibration_subset
+  subset_selection: ascending_sha256_of_utf8_canonical_image_id
+  seed: 42
+  sample_seed_key: [image_id, corruption, severity, base_seed]
+  ordered_conditions:
+    - [clean, 0]
+    - [gaussian_noise, 1]
+    - [gaussian_noise, 3]
+    - [gaussian_noise, 5]
+    - [gaussian_blur, 1]
+    - [gaussian_blur, 3]
+    - [gaussian_blur, 5]
+    - [low_contrast, 1]
+    - [low_contrast, 3]
+    - [low_contrast, 5]
+    - [stripe_noise, 1]
+    - [stripe_noise, 3]
+    - [stripe_noise, 5]
+  condition_count_per_dataset: 13
+
+preprocessing:
+  image_color_space: RGB
+  image_resize: {size: [256, 256], interpolation: bilinear}
+  mask_resize: {size: [256, 256], interpolation: nearest}
+  image_range_before_corruption: [0.0, 1.0]
+  normalization:
+    name: ImageNet
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+    order: after_corruption
+  mask_corrupted: false
+
+materialized_cache:
+  root: results/binary_tent/source_calibration_cache_v1
+  cache_format: nsfpn-materialized-source-calibration-cache-v1
+  immutable_after_completion: true
+  overwrite_existing_complete_cache: false
+  build_in_sibling_staging_directory: true
+  publish_with_atomic_directory_rename: true
+  exclusive_sibling_publish_lock: true
+  require_complete_sentinel: true
+  consumers_must_not_regenerate_corruptions: true
+  consumers_use_read_only_mmap_and_private_sample_copy: true
+  images:
+    format: numpy_npy
+    dtype: little_endian_float32
+    shape: [64, 3, 256, 256]
+    domain: imagenet_normalized_after_physical_corruption
+    contiguous_order: C
+    one_file_per_condition: true
+  targets:
+    format: numpy_npy
+    dtype: little_endian_float32
+    shape: [64, 1, 256, 256]
+    one_file_per_dataset: true
+    path: outer_evaluator/targets.npy
+    method_facing_access: forbidden
+    outer_evaluator_access: allowed_after_episode
+    outer_evaluator_requires_explicit_episodes_complete: true
+  official_consumers:
+    method_facing: SourceCalibrationMethodInputDataset
+    method_facing_manifest: method_input_manifest.json
+    expected_protocol_sha256_required: true
+    method_facing_fields:
+      [image, image_id, original_size, dataset, corruption, severity, seed]
+    outer_evaluator_targets: load_outer_evaluator_targets
+    generic_cached_corruption_dataset_for_adaptation: forbidden
+  required_hashes:
+    - ordered_ids_sha256
+    - source_file_manifest_sha256
+    - tensor_sequence_sha256
+    - file_sha256
+    - manifest_sha256
+    - method_input_manifest_sha256
+  runtime_seal:
+    enabled: true
+    binds:
+      - launch_protocol
+      - all_materializer_provenance_paths
+    verify_at:
+      - process_entry
+      - validation_complete
+      - materialization_start
+      - after_every_condition
+      - before_manifest_write
+      - before_atomic_publish
+    drift_policy: fail_closed_and_do_not_publish
+    record_in_manifest_and_complete: true
+
+datasets:
+  IRSTD-1K:
+    root: datasets/IRSTD-1K
+    train_split: datasets/IRSTD-1K/img_idx/train_IRSTD-1K.txt
+    train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+    train_images: 800
+    test_split: datasets/IRSTD-1K/img_idx/test_IRSTD-1K.txt
+    test_split_sha256: 8c71e474358acb84f2cbebfd1282ffea236f9cb852b7f7c04feb2fd99804c579
+    test_images: 201
+    corpus_manifest_sha256: da97df00f1a3bb96d801ff0024d58a3e0c4822844102c65a0657fb6229178edd
+    pilot_ordered_ids_sha256: 09a27c1d085bb5816da442fbcd50998b9716d757ad9cc914d86e75d9ea0978d6
+    pilot_source_manifest_sha256: b4b516366392408709c2aa361db8cd30a8e2724deaca7970fd15febeccbee082
+    pilot_image_manifest_sha256: 52840b6b18784acda7d1fcab83ce11b26684e1554fc0671b068beefdc95992b4
+    pilot_mask_manifest_sha256: b84b8bfab5fb4981dc4b34627d8f11c3f4c58f4ede54cbc02321bbcb8c6c64b5
+    expected_gt_tensor_sequence_sha256: b23e574baee9c599ca2c3b8388edd2c164f0f3e9b9b89cb42f1d6a12904ebdfb
+    parent_pilot:
+      artifact: results/corruption_pilot_fixed_split/round_02/IRSTD-1K/pilot.json
+      artifact_sha256: 627028aa4e9a903a14ac9298bcca7bcfbd6c90d7de06c9bd786a380aed7eda67
+      manifest: results/corruption_pilot_fixed_split/round_02/IRSTD-1K/artifact_manifest.json
+      manifest_sha256: 5aa55b3206be25e6f65a499ed0e13541added597dc31770546a0f26456242ca5
+      complete: results/corruption_pilot_fixed_split/round_02/IRSTD-1K/COMPLETE.json
+      complete_sha256: 845a11982c57ce9529aca9ab4ba8ddf3e7f54d15145dd0be77c75a61d1239433
+    checkpoint: results/retraining_fixed_split/IRSTD-1K/best_miou.pth.tar
+    checkpoint_sha256: ee8d5c3af67d7c93ff6be25b169bd8fd59afcd776afd173b4e230ad8dc8aa8b2
+    checkpoint_epoch: 535
+
+  NUAA-SIRST:
+    root: datasets/NUAA-SIRST
+    train_split: datasets/NUAA-SIRST/img_idx/train_NUAA-SIRST.txt
+    train_split_sha256: 324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4
+    train_images: 213
+    test_split: datasets/NUAA-SIRST/img_idx/test_NUAA-SIRST.txt
+    test_split_sha256: e49023203a323c247306b314f23c8b3b917093a26984067792355adff7a8386e
+    test_images: 214
+    corpus_manifest_sha256: a3a5e9579580966c33d20b5544026be5642458efe2c9688bf8ba2bfb6ec56425
+    pilot_ordered_ids_sha256: 97c12e4fccb20c9a8df2a3c4c5d57ba3ebd3b6bef636a51d0af3a503334ba346
+    pilot_source_manifest_sha256: 263a1b9430a0a43e66cbabad0570b660abf9a265c97a3d7d62fc569e853f9b1a
+    pilot_image_manifest_sha256: 9a2a119d8c6cd5e844c25c902f310b88bf1f4b68a6efeef5b2d62e01ecb296cd
+    pilot_mask_manifest_sha256: 23e830d4d23129998cb2e10261e22ee844b1b6f49b564ea788af9cf34bea59c7
+    expected_gt_tensor_sequence_sha256: 7416c5fc12cc68086d33ca9971103bd0838759fef702fc109502a60ec7e4201b
+    parent_pilot:
+      artifact: results/corruption_pilot_fixed_split/round_02/NUAA-SIRST/pilot.json
+      artifact_sha256: e32db90428b0e061493542ea32e6b4a99f7ea9e8a9cec3d0cb62bbe72ae929c7
+      manifest: results/corruption_pilot_fixed_split/round_02/NUAA-SIRST/artifact_manifest.json
+      manifest_sha256: be924449fc16864b29a9163acde28208afbcea35a51fe7ea9f675393c2bcc725
+      complete: results/corruption_pilot_fixed_split/round_02/NUAA-SIRST/COMPLETE.json
+      complete_sha256: a2decf1a435a46c6d12fbb83662c64ce15b49cb9cfe5f74d66db048a2bcd4117
+    checkpoint: results/retraining_fixed_split/NUAA-SIRST/best_miou.pth.tar
+    checkpoint_sha256: 23feea50a847cdfc9874fe67d338a3884d9afa75d7a27b9b71a62ff2d00379cf
+    checkpoint_epoch: 981
+
+  NUDT-SIRST:
+    root: datasets/NUDT-SIRST
+    train_split: datasets/NUDT-SIRST/img_idx/train_NUDT-SIRST.txt
+    train_split_sha256: e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3
+    train_images: 663
+    test_split: datasets/NUDT-SIRST/img_idx/test_NUDT-SIRST.txt
+    test_split_sha256: a463c52ee64b1c803c4a322fe090aaf6bc360844898e3943bb7c64a8e551b86e
+    test_images: 664
+    corpus_manifest_sha256: 2e97515b4c395be37a931a405a14381090907c1023563e2cd4fea13cad155e32
+    pilot_ordered_ids_sha256: 19cab65e6d89fd2861f00f04f985ea5e293e7b8924cd6077f1f13983379e9dfb
+    pilot_source_manifest_sha256: 6aca96f881c00d7ed2d0aaddd00ece16ee6e453e135fc5378ebd8362e2777660
+    pilot_image_manifest_sha256: 89ceeae91a086c80f68c10b766e1fd47f2a60f978390f4e3a8c19fa51aa7094b
+    pilot_mask_manifest_sha256: d23d728de6fa61d38360922914ac9fe1bfafba5c8e2a9a7bd12c9ba03fdb3a04
+    expected_gt_tensor_sequence_sha256: 0f72b60948fe70aea1bb7a7f97df7ce16f7eb6c4321c6764e54a4e89d5ba9093
+    parent_pilot:
+      artifact: results/corruption_pilot_fixed_split/round_02/NUDT-SIRST/pilot.json
+      artifact_sha256: d5bd0c896ccb993fd1dd8384352597489017c870f258a53411dba706f35390e7
+      manifest: results/corruption_pilot_fixed_split/round_02/NUDT-SIRST/artifact_manifest.json
+      manifest_sha256: 0a170c5ea61e280e3f1d6a6c477fe208ec9880bd7865503b51c1cf080659c914
+      complete: results/corruption_pilot_fixed_split/round_02/NUDT-SIRST/COMPLETE.json
+      complete_sha256: da44c220ccbfbab510f1632dd494e7c3b602be4ebebf1b7ba749d0275bc7b925
+    checkpoint: results/retraining_fixed_split/NUDT-SIRST/best_miou.pth.tar
+    checkpoint_sha256: a67d3a7e2597d201e1fecf32b7f218aefa8274ad0443d2726197d84f44d1343e
+    checkpoint_epoch: 812

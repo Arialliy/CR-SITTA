@@ -8,7 +8,7 @@ from PIL import Image
 import pytest
 import torch
 
-from dataset.research_dataset import (
+from dataio.research_dataset import (
     IMAGENET_MEAN,
     IMAGENET_STD,
     IRSTDResearchDataset,
@@ -304,12 +304,12 @@ def test_invalid_protocol_ranges_are_rejected(
 @pytest.mark.parametrize(
     ("relative_path", "expected_count"),
     [
-        ("dataset/IRSTD-1k/trainval.txt", 800),
-        ("dataset/IRSTD-1k/test.txt", 201),
-        # These two files intentionally omit a trailing newline, so ``wc -l``
-        # reports one less than the actual number of IDs.
-        ("dataset/NUAA-SIRST/trainval.txt", 341),
-        ("dataset/NUAA-SIRST/test.txt", 86),
+        ("datasets/IRSTD-1K/img_idx/train_IRSTD-1K.txt", 800),
+        ("datasets/IRSTD-1K/img_idx/test_IRSTD-1K.txt", 201),
+        ("datasets/NUAA-SIRST/img_idx/train_NUAA-SIRST.txt", 213),
+        ("datasets/NUAA-SIRST/img_idx/test_NUAA-SIRST.txt", 214),
+        ("datasets/NUDT-SIRST/img_idx/train_NUDT-SIRST.txt", 663),
+        ("datasets/NUDT-SIRST/img_idx/test_NUDT-SIRST.txt", 664),
     ],
 )
 def test_checked_in_official_split_coverage_is_unique_and_read_only(

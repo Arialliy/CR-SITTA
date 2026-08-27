@@ -1,0 +1,138 @@
+schema_version: 1
+protocol_id: cr-sitta-adabn-source-pilot-smoke-v1
+created_at: "2026-08-26"
+
+scope:
+  stage: source_domain_implementation_smoke
+  purpose: validate_single_image_episodic_adabn_behavior
+  paper_result: false
+  performance_metrics_computed: false
+  tuning_allowed: false
+  fixed_test_split_metadata_for_leakage_guard_only: true
+  use_test_images: false
+  use_test_labels: false
+
+method:
+  name: AdaBN
+  implementation: tta/adabn.py
+  bn_protocol: single_image_spatial_batch_stats
+  learnable_update: false
+  loss: null
+  backward: false
+  optimizer: null
+  optimizer_steps_per_image: 0
+  episodic_reset: per_image
+  third_party_reference:
+    repository: https://github.com/DequanWang/tent.git
+    commit: e9e926a668d85244c66a6d5c006efbd2b82e83e8
+    license: MIT
+    local_path: third_party/tent
+    reference_file: third_party/tent/norm.py
+    source_modified: false
+
+source:
+  architecture: MSHNet_NSFPN
+  warm_flag: false
+  checkpoint_role: best_miou
+  checkpoint: results/retraining_fixed_split/IRSTD-1K/best_miou.pth.tar
+  checkpoint_sha256: ee8d5c3af67d7c93ff6be25b169bd8fd59afcd776afd173b4e230ad8dc8aa8b2
+  checkpoint_epoch: 535
+  checkpoint_selection_metric: miou
+  checkpoint_test_selected: true
+  checkpoint_disclosure: >-
+    The locked NS-FPN best_miou checkpoint was selected by repeated evaluation
+    of the fixed test split during source training. This source-domain smoke
+    performs no checkpoint, threshold, corruption, or method selection.
+
+dataset:
+  name: IRSTD-1K
+  root: datasets/IRSTD-1K
+  train_split: datasets/IRSTD-1K/img_idx/train_IRSTD-1K.txt
+  train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+  train_images: 800
+  test_split: datasets/IRSTD-1K/img_idx/test_IRSTD-1K.txt
+  test_split_sha256: 8c71e474358acb84f2cbebfd1282ffea236f9cb852b7f7c04feb2fd99804c579
+  test_images: 201
+  selected_ids_file: configs/adabn_source_pilot_ids_irstd1k.txt
+  selected_ids_file_sha256: 694a3891cae3f51a1c1164da4b3680cf729bcd03b036813e1bc6404aae43ddce
+  selected_count: 32
+  selected_ids_sha256: c36fe56be299c57d202e2532af9bce5ef08ad8c41232711f7621c62130b3c5d5
+  selection_rule: first_32_ranks_of_frozen_round_02_pilot_64
+  selected_source_manifests:
+    algorithm: sorted-id-image_sha256-mask_sha256-lf-v1
+    combined_sha256: a17909cb94f2c41ceb309e69f6e452d5c63e5f70f40abd025666e430a39edd62
+    images_sha256: 08c85860d603b7a09014d536a01475f789244db6e9c3224a266eab6e9f9a812c
+    masks_sha256: df208fc5245a7415f67b197e8602e58762556d7a6ebb94dc117b1b0d4923908a
+
+parent_pilot:
+  artifact: results/corruption_pilot_fixed_split/round_02/IRSTD-1K/pilot.json
+  artifact_sha256: 627028aa4e9a903a14ac9298bcca7bcfbd6c90d7de06c9bd786a380aed7eda67
+  artifact_manifest: results/corruption_pilot_fixed_split/round_02/IRSTD-1K/artifact_manifest.json
+  artifact_manifest_sha256: 5aa55b3206be25e6f65a499ed0e13541added597dc31770546a0f26456242ca5
+  complete: results/corruption_pilot_fixed_split/round_02/IRSTD-1K/COMPLETE.json
+  parent_selected_count: 64
+  parent_selected_ids_sha256: 09a27c1d085bb5816da442fbcd50998b9716d757ad9cc914d86e75d9ea0978d6
+
+condition:
+  corruption: gaussian_noise
+  severity: 3
+  seed: 42
+  severity_table: corruptions/severity_tables.yaml
+  severity_table_sha256: c3218738fd32f2cfa2a24731456d9dc18fa648eb7b0b6e1fbd5175c605ba0536
+  severity_table_frozen: true
+  parameters: {sigma: 0.014}
+  condition_key: gaussian_noise_S3
+
+preprocessing:
+  image_color_space: RGB
+  image_resize: {size: [256, 256], interpolation: bilinear}
+  mask_resize: {size: [256, 256], interpolation: nearest}
+  physical_image_range: [0.0, 1.0]
+  corruption_before_normalization: true
+  normalization:
+    name: ImageNet
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+  expected_input_tensor_sequence_sha256: d09021a7c46d95bad657bef79fbbe3dbf35e5b5ed0a8fc565578a60784c60885
+  expected_mask_tensor_sequence_sha256: 72e24aceb85a12e390d5ec70746fa937a25e5e8cc6b77bc35434e82b6a2661b2
+
+execution:
+  batch_size: 1
+  num_workers: 0
+  canonical_order: selected_ids_file_order
+  order_check: canonical_then_exact_reverse
+  reuse_identical_materialized_inputs_across_orders: true
+  expected_batchnorm2d_modules: 53
+  probability_transform: sigmoid_once
+  fixed_probability_threshold: 0.5
+  threshold_rule: strict_greater_than
+
+required_gates:
+  - exact_32_parent_pilot_prefix
+  - zero_fixed_test_id_overlap
+  - zero_test_image_or_mask_opens
+  - exact_corrupted_input_hash
+  - finite_source_and_adabn_outputs
+  - all_parameters_and_buffers_unchanged_before_reset
+  - all_bn_running_mean_unchanged
+  - all_bn_running_var_unchanged
+  - all_bn_num_batches_tracked_unchanged
+  - only_runtime_state_changes_during_adabn
+  - no_gradients_or_optimizer
+  - non_batchnorm_modules_remain_eval
+  - per_image_reset_matches_source
+  - canonical_reverse_logits_bit_exact
+  - at_least_one_probability_map_differs_from_source
+  - all_source_and_adabn_outputs_saved
+
+outputs:
+  root: results/adabn/adabn_source_pilot_smoke_v1
+  dataset_directory: IRSTD-1K
+  condition_directory: gaussian_noise_S3
+  atomic_sibling_staging: true
+  refuse_overwrite: true
+  save_all_source_probability_maps: true
+  save_all_adabn_probability_maps: true
+  save_all_source_binary_masks: true
+  save_all_adabn_binary_masks: true
+  complete_only_after_all_gates: true

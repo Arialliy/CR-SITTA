@@ -1,10 +1,10 @@
 # Third-party source register
 
-The CR-SITTA additions in Steps 0-3 were implemented without copying code from
-another test-time-adaptation repository. `third_party/` is intentionally empty
-apart from its placeholder. Whenever reference code is added, record its URL,
-full commit SHA, license, local path, and whether any code was adapted here; add
-the same SHA to `THIRD_PARTY_COMMITS.txt`.
+The CR-SITTA additions are local rewrites and do not import code from another
+test-time-adaptation repository. Reference repositories under `third_party/`
+are ignored by Git, pinned to exact revisions, and treated as read-only. Their
+URL, full commit SHA, license, local path, and integration status are recorded
+here and in `THIRD_PARTY_COMMITS.txt`.
 
 ## Host project
 
@@ -29,11 +29,22 @@ The corpus manifest hashes identify the exact local bytes used for experiments;
 they do not grant permission to publish those bytes. A public artifact must link
 to the dataset/checkpoint owners' distribution points or obtain written terms.
 
+## Verified reference implementations
+
+| Component | Upstream | Frozen revision | License | Local use |
+| --- | --- | --- | --- | --- |
+| TENT / Test-Time Norm | <https://github.com/DequanWang/tent> | `e9e926a668d85244c66a6d5c006efbd2b82e83e8` | MIT | Read-only behavioral reference at `third_party/tent`; no direct import or copied implementation |
+
+The complete TENT file hashes and the deliberate differences in the strict
+single-image episodic AdaBN rewrite are recorded in
+`third_party/tent_reference.json`. In particular, CR-SITTA keeps non-BN modules
+in evaluation mode, freezes all learnable parameters, disables BN running-stat
+accumulation, and restores the complete Source state after every image.
+
 ## Planned reference implementations
 
 These repositories are links only; they have not yet been cloned or copied:
 
-- TENT: <https://github.com/DequanWang/tent>
 - PIN-DGA: <https://github.com/jzchenriver/PIN-DGA>
 - SITTA-Segmentation: <https://github.com/klarajanouskova/SITTA-Segmentation>
 - MEMO: <https://github.com/zhangmarvin/memo>

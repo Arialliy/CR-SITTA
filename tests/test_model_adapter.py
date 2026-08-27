@@ -83,6 +83,49 @@ def test_source_mode_restores_bn_flags_after_batch_stat_mode() -> None:
     assert model.bn.track_running_stats
 
 
+def test_adabn_mode_uses_batch_stats_without_updating_buffers_or_parameters() -> None:
+    model = TinyNSFPNLike()
+    adapter = IRSTDModelAdapter(model)
+    running_mean = model.bn.running_mean.clone()
+    running_var = model.bn.running_var.clone()
+    batches = model.bn.num_batches_tracked.clone()
+    parameters = {
+        name: parameter.detach().clone()
+        for name, parameter in model.named_parameters()
+    }
+
+    adapter.set_adabn_mode()
+    with torch.no_grad():
+        adapter.forward_logits(torch.randn(1, 3, 8, 8))
+
+    assert not model.training
+    assert not model.dropout.training
+    assert model.bn.training
+    assert not model.bn.track_running_stats
+    assert not any(parameter.requires_grad for parameter in model.parameters())
+    assert torch.equal(model.bn.running_mean, running_mean)
+    assert torch.equal(model.bn.running_var, running_var)
+    assert torch.equal(model.bn.num_batches_tracked, batches)
+    assert all(
+        torch.equal(parameter, parameters[name])
+        for name, parameter in model.named_parameters()
+    )
+
+
+def test_adabn_requires_at_least_one_batchnorm2d() -> None:
+    class NoBatchNormModel(nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.head = nn.Conv2d(3, 1, 1)
+
+        def forward(self, image, warm_flag):
+            del warm_flag
+            return image, self.head(image)
+
+    with pytest.raises(ValueError, match="at least one BatchNorm2d"):
+        IRSTDModelAdapter(NoBatchNormModel()).set_adabn_mode()
+
+
 def test_rejects_probability_shape_or_invalid_model_return() -> None:
     with pytest.raises(ValueError):
         IRSTDModelAdapter.logits_to_prob(torch.zeros(1, 2, 3, 3))

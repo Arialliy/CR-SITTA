@@ -1,0 +1,128 @@
+schema_version: 1
+protocol_id: cr-sitta-binary-tent-cross-process-repro-candidate-v1
+created_at: "2026-08-26"
+
+scope:
+  stage: source_domain_cross_process_reproducibility_audit
+  purpose: measure_independent_process_gpu_drift_and_propose_a_nonbinding_tolerance_candidate
+  paper_result: false
+  scientific_result_frozen: false
+  tuning_allowed: false
+  optimizer_selection_allowed: false
+  tolerance_automatically_frozen: false
+  use_test_images: false
+  use_test_labels: false
+  train_labels_outer_evaluator_only: true
+
+source_smoke_contract:
+  config: configs/binary_tent_source_smoke_v1.yaml
+  config_sha256: 012cc5ed1c3a355164d5816f305bb4e242ae355c0bfc9b66b50fc2456e09f5e4
+  selected_count: 32
+  selected_ids_sha256: c36fe56be299c57d202e2532af9bce5ef08ad8c41232711f7621c62130b3c5d5
+  input_tensor_sequence_sha256: d09021a7c46d95bad657bef79fbbe3dbf35e5b5ed0a8fc565578a60784c60885
+  mask_tensor_sequence_sha256: 72e24aceb85a12e390d5ec70746fa937a25e5e8cc6b77bc35434e82b6a2661b2
+  condition: {dataset: IRSTD-1K, corruption: gaussian_noise, severity: 3, seed: 42}
+
+published_reference:
+  run_id: published_reference
+  role: immutable_historical_independent_process
+  root: results/binary_tent/source_implementation_smoke_v1
+  protocol_id: cr-sitta-binary-tent-source-implementation-smoke-v1
+  protocol_sha256: 012cc5ed1c3a355164d5816f305bb4e242ae355c0bfc9b66b50fc2456e09f5e4
+  complete_sha256: 90076917524486f78aec1f72bcdf2ae20d1d611ab8ebf894feb8c2f19a441480
+  artifact_manifest_sha256: 6a4333d6fadd2c19cff8e04d76368c408e3dfb3e890764f3e431616c864fc0d3
+  provenance_sha256: d3ffbb8b6c482332d6ae3e948d0224a0af20062f9e963055606f9c85b8062a10
+  aggregate_metrics_sha256: 19845e08697cd7527ca39e4358ec9c940f1340e132f8a1e9359880f20fae96a5
+  canonical_pass_only: true
+
+method:
+  name: Binary Episodic TENT
+  protocols:
+    - single_image_spatial_batch_stats
+    - source_running_statistics
+  optimizer: {name: Adam, learning_rate: 1.0e-3, selected: false}
+  entropy_eps: 1.0e-6
+  optimizer_steps_per_image: 1
+  amp_enabled: false
+  episodic_reset: exact_source_model_optimizer_bn_runtime_gradients_rng_per_image
+
+execution:
+  device_type: cuda
+  worker_count: 2
+  worker_ids: [worker_01, worker_02]
+  launch_mode: sequential_fresh_python_processes
+  canonical_passes_per_worker: 1
+  canonical_order: selected_ids_file_order
+  episodes_per_protocol_per_worker: 32
+  episodes_per_worker: 64
+  historical_reference_processes: 1
+  minimum_independent_processes: 3
+  expected_pairwise_comparisons: 3
+  batch_size: 1
+  num_workers: 0
+  expected_batchnorm2d_modules: 53
+  expected_trainable_tensors: 106
+  expected_trainable_scalars: 8736
+  cublas_workspace_config: ":4096:8"
+  deterministic_policy: strict_forwards_temporary_entropy_backward_disable
+  require_cuda_uninitialized_before_worker_policy: true
+
+evaluation:
+  role: outer_train_side_reproducibility_diagnostic_only
+  fixed_probability_threshold: 0.5
+  threshold_rule: strict_greater_than
+  connectivity: 2
+  max_centroid_distance: 3.0
+  min_component_area: 1
+  evaluators:
+    - official_nsfpn_operating_point
+    - unified_fixed_probability_0_5
+  metrics: [iou, pd, fa_per_million_pixels]
+
+comparison:
+  all_unordered_run_pairs_required: true
+  source_pre_probability_bit_exact_required: true
+  tent_pre_probability_bit_exact_required: true
+  source_pre_mask_bit_exact_required: true
+  tent_pre_mask_bit_exact_required: true
+  full_state_reset_required_every_episode: true
+  tent_post_bit_exact_required: false
+  measure_tent_post:
+    - probability_mean_abs_difference
+    - probability_max_abs_difference
+    - mask_disagreement_pixels
+    - mask_disagreement_rate
+    - official_iou_pd_fa_absolute_difference
+    - unified_iou_pd_fa_absolute_difference
+    - optimizer_step_norm_absolute_difference
+
+tolerance_candidate:
+  automatic_output: candidate_only
+  scientific_tolerance_frozen: false
+  formal_acceptance_gate: false
+  safety_multiplier: 1.5
+  derivation: safety_multiplier_times_max_observed_over_all_unordered_run_pairs
+  freeze_requires: explicit_human_scientific_review_and_new_versioned_protocol
+
+outputs:
+  root: results/binary_tent/cross_process_repro_candidate_v1
+  atomic_sibling_staging: true
+  worker_atomic_publication_inside_parent_staging: true
+  refuse_overwrite: true
+  save_worker_probabilities: true
+  save_worker_masks: true
+  save_pairwise_per_image_evidence: true
+  complete_only_after_all_hard_gates: true
+
+required_hard_gates:
+  - immutable_published_reference_verified
+  - runtime_code_bytes_match_published_reference
+  - runtime_files_unchanged_during_execution
+  - two_fresh_unique_worker_processes_completed
+  - three_independent_run_artifacts_compared
+  - all_three_unordered_pairs_compared
+  - exactly_64_episodes_per_worker
+  - source_and_tent_pre_bit_exact_for_every_pair
+  - every_worker_episode_reset_exact_source_state
+  - zero_test_pixel_opens
+  - tolerance_output_is_candidate_only_not_frozen

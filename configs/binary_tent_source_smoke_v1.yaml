@@ -1,0 +1,137 @@
+schema_version: 1
+protocol_id: cr-sitta-binary-tent-source-implementation-smoke-v1
+created_at: "2026-08-26"
+
+scope:
+  stage: source_domain_implementation_smoke
+  purpose: validate_one_step_binary_episodic_tent_and_measure_gpu_repeatability
+  paper_result: false
+  scientific_result_frozen: false
+  tuning_allowed: false
+  optimizer_selection_allowed: false
+  use_test_images: false
+  use_test_labels: false
+  train_labels_outer_evaluator_only: true
+
+frozen_source_input:
+  adabn_config: configs/adabn_source_pilot_smoke_v1.yaml
+  adabn_config_sha256: a9f05c416b98a7a5334a33de366f773f0c0b3500f8c19144811dacdaffcb8232
+  selected_ids_file: configs/adabn_source_pilot_ids_irstd1k.txt
+  selected_ids_file_sha256: 694a3891cae3f51a1c1164da4b3680cf729bcd03b036813e1bc6404aae43ddce
+  selected_count: 32
+  selected_ids_sha256: c36fe56be299c57d202e2532af9bce5ef08ad8c41232711f7621c62130b3c5d5
+  input_tensor_sequence_sha256: d09021a7c46d95bad657bef79fbbe3dbf35e5b5ed0a8fc565578a60784c60885
+  mask_tensor_sequence_sha256: 72e24aceb85a12e390d5ec70746fa937a25e5e8cc6b77bc35434e82b6a2661b2
+  dataset: IRSTD-1K
+  condition: {corruption: gaussian_noise, severity: 3, seed: 42}
+  fixed_adabn_artifact:
+    root: results/adabn/adabn_source_pilot_smoke_v1
+    complete_sha256: afdb7f9318cb7d8affc1a099e10fc61e05b0e6c7c90ddc0b7cf0671db52d2c1d
+    artifact_manifest_sha256: fda29cd7c1f58a5b27fb13731a169a54cc9cc88555c4e95749bc969bee00102d
+    provenance_sha256: 42c7480d2b89f20b47d783a0a163d6fc7ad4371a50055cde285e6674a39e95a5
+    condition_metrics_sha256: 5077d40405ddcc7cc2dead94b0845c449b49ca9cf7de64c220711c749c91e8f6
+
+method:
+  name: Binary Episodic TENT
+  implementation: tta/binary_tent.py
+  runner: tta/binary_tent_runner.py
+  protocols:
+    - single_image_spatial_batch_stats
+    - source_running_statistics
+  loss: full_image_mean_binary_sigmoid_entropy
+  entropy_eps: 1.0e-6
+  optimizer:
+    name: Adam
+    learning_rate: 1.0e-3
+    status: provisional_implementation_smoke_only
+    selected_by_this_smoke: false
+  optimizer_steps_per_image: 1
+  episodic_reset: per_image_exact_source_model_optimizer_bn_runtime_gradients_rng
+  amp_enabled: false
+
+evaluation:
+  role: outer_train_side_repeatability_diagnostic_only
+  method_receives_labels: false
+  fixed_probability_threshold: 0.5
+  threshold_rule: strict_greater_than
+  connectivity: 2
+  max_centroid_distance: 3.0
+  min_component_area: 1
+  report_official_nsfpn_metrics: true
+  report_unified_metrics: true
+  metric_differences_are_not_method_selection_evidence: true
+
+execution:
+  device_type: cuda
+  batch_size: 1
+  num_workers: 0
+  canonical_order: selected_ids_file_order
+  reverse_order_runs: 1
+  canonical_repeat_runs: 3
+  reuse_identical_materialized_inputs_across_all_runs: true
+  expected_batchnorm2d_modules: 53
+  expected_trainable_tensors: 106
+  expected_trainable_scalars: 8736
+  deterministic_algorithms:
+    policy: strict_forwards_temporary_backward_disable
+    forward_enabled: true
+    forward_warn_only: false
+    backward_enabled: false
+    backward_disable_scope: entropy_backward_only
+    post_backward_enabled: true
+    post_forward_enabled: true
+    reason: >-
+      real_nsfpn_cuda_backward_uses_adaptive_max_pool_replicate_pad_and_custom
+      deformable_attention_backward_without_a_complete_deterministic_contract
+  cublas_workspace_config: ":4096:8"
+  cudnn_deterministic: true
+  cudnn_benchmark: false
+  restore_process_global_policy_after_run: true
+
+repeatability:
+  source_pre_must_be_bit_exact_across_orders_and_repeats: true
+  tent_pre_must_be_bit_exact_across_orders_and_repeats: true
+  batch_stats_tent_pre_must_match_frozen_adabn_bit_exact: true
+  source_stats_tent_pre_must_match_source_pre_bit_exact: true
+  tent_post_bit_exact_required: false
+  measure:
+    - logits_max_abs_difference
+    - probabilities_mean_abs_difference
+    - probabilities_max_abs_difference
+    - binary_mask_disagreement_pixels_and_rate
+    - official_iou_pd_fa_difference
+    - unified_iou_pd_fa_difference
+    - optimizer_step_norm_absolute_difference
+  tolerance_output:
+    status: train_derived_candidate_only
+    formal_acceptance_gate: false
+    frozen_by_this_smoke: false
+
+outputs:
+  root: results/binary_tent/source_implementation_smoke_v1
+  atomic_sibling_staging: true
+  refuse_overwrite: true
+  save_canonical_source_pre_probability_maps: true
+  save_canonical_tent_pre_probability_maps: true
+  save_canonical_tent_post_probability_maps: true
+  save_canonical_source_pre_masks: true
+  save_canonical_tent_pre_masks: true
+  save_canonical_tent_post_masks: true
+  save_noncanonical_predictions: false
+  complete_only_after_all_hard_gates: true
+
+required_hard_gates:
+  - frozen_32_train_ids_and_input_hashes_verified
+  - zero_test_pixel_opens
+  - method_received_no_label
+  - both_bn_protocols_executed
+  - exactly_one_unconditional_optimizer_step_per_episode
+  - only_bn_affine_trainable
+  - finite_outputs_gradients_and_steps
+  - batch_stats_tent_pre_matches_frozen_adabn
+  - source_stats_tent_pre_matches_source
+  - source_and_tent_pre_repeat_order_bit_exact
+  - strict_deterministic_forward_and_temporary_backward_policy
+  - every_episode_resets_exact_source_state
+  - all_canonical_predictions_saved
+  - process_global_policy_restored

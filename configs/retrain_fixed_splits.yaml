@@ -1,0 +1,59 @@
+schema_version: 1
+protocol_id: nsfpn-fixed-train-test-1000e-v1
+created_at: "2026-08-25"
+
+training:
+  architecture: MSHNet_NSFPN
+  initialization: random
+  epochs: 1000
+  evaluation_start_epoch: 500
+  evaluation_frequency: 1
+  batch_size: 16
+  optimizer: Adagrad
+  learning_rate: 0.05
+  warm_epochs: 5
+  base_size: 256
+  crop_size: 224
+  seed: 42
+  checkpoint_selection:
+    best_miou: maximize_miou_then_pd_then_minimize_fa
+    best_pd: maximize_pd_then_minimize_fa_then_miou
+  disclosure: >-
+    The fixed test split is evaluated after every epoch from epoch 500 through
+    epoch 1000 and is used to select both exported best checkpoints. These are
+    test-selected checkpoints, not estimates from an untouched final test set.
+
+datasets:
+  IRSTD-1K:
+    root: datasets/IRSTD-1K
+    train_split: datasets/IRSTD-1K/img_idx/train_IRSTD-1K.txt
+    train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+    train_images: 800
+    test_split: datasets/IRSTD-1K/img_idx/test_IRSTD-1K.txt
+    test_split_sha256: 8c71e474358acb84f2cbebfd1282ffea236f9cb852b7f7c04feb2fd99804c579
+    test_images: 201
+    corpus_manifest_sha256: da97df00f1a3bb96d801ff0024d58a3e0c4822844102c65a0657fb6229178edd
+    known_size_mismatches: []
+  NUAA-SIRST:
+    root: datasets/NUAA-SIRST
+    train_split: datasets/NUAA-SIRST/img_idx/train_NUAA-SIRST.txt
+    train_split_sha256: 324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4
+    train_images: 213
+    test_split: datasets/NUAA-SIRST/img_idx/test_NUAA-SIRST.txt
+    test_split_sha256: e49023203a323c247306b314f23c8b3b917093a26984067792355adff7a8386e
+    test_images: 214
+    corpus_manifest_sha256: a3a5e9579580966c33d20b5544026be5642458efe2c9688bf8ba2bfb6ec56425
+    known_size_mismatches:
+      - image_id: Misc_111
+        image_size: [325, 220]
+        mask_size: [592, 400]
+  NUDT-SIRST:
+    root: datasets/NUDT-SIRST
+    train_split: datasets/NUDT-SIRST/img_idx/train_NUDT-SIRST.txt
+    train_split_sha256: e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3
+    train_images: 663
+    test_split: datasets/NUDT-SIRST/img_idx/test_NUDT-SIRST.txt
+    test_split_sha256: a463c52ee64b1c803c4a322fe090aaf6bc360844898e3943bb7c64a8e551b86e
+    test_images: 664
+    corpus_manifest_sha256: 2e97515b4c395be37a931a405a14381090907c1023563e2cd4fea13cad155e32
+    known_size_mismatches: []

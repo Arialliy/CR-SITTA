@@ -56,7 +56,7 @@ DATASET_DEFAULTS = {
 
 SOURCE_PROVENANCE_PATHS = (
     "configs/protocol.yaml",
-    "dataset/research_dataset.py",
+    "dataio/research_dataset.py",
     "environment.cr-sitta.yml",
     "environment.linux-64.explicit.txt",
     "metrics/connected_components.py",
@@ -455,7 +455,7 @@ def build_research_dataset(
 ):
     """Import and construct the standard clean research dataset lazily."""
 
-    from dataset.research_dataset import IRSTDResearchDataset
+    from dataio.research_dataset import IRSTDResearchDataset
 
     return IRSTDResearchDataset(
         dataset_root,

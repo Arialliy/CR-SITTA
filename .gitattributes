@@ -1,0 +1,2 @@
+# Split manifests are byte-locked by SHA256 in the experiment protocols.
+datasets/*/img_idx/*.txt -text

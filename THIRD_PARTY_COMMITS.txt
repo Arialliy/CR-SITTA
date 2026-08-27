@@ -1,3 +1,2 @@
-# No external baseline repository is vendored for Steps 0-3.
-# Add one line as "<name> <full-commit-sha>" whenever a repository is added
-# under third_party/.
+# Reference repositories are local, read-only, and ignored by Git.
+tent e9e926a668d85244c66a6d5c006efbd2b82e83e8

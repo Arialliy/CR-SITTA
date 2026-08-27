@@ -10,7 +10,7 @@ This repository implements and validates Steps 0–3 of
 |---|---|---|
 | 0 | Protocol, source commit, splits, checkpoints, evaluation rules, corruption rules, and dependency versions frozen | `configs/protocol.yaml`, `BASE_COMMIT.txt`, `THIRD_PARTY_COMMITS.txt`, `THIRD_PARTY.md`, `environment.cr-sitta.yml`, `requirements.lock.txt` |
 | 1 | Official Source baseline reproduced on both complete test splits | `test_source.py`, `results/source_reproduction/<dataset>/` |
-| 2 | One model/probability interface and one research evaluator implemented and tested | `tta/model_adapter.py`, `dataset/research_dataset.py`, `metrics/` |
+| 2 | One model/probability interface and one research evaluator implemented and tested | `tta/model_adapter.py`, `dataio/research_dataset.py`, `metrics/` |
 | 3 | Clean plus four deterministic physical-domain corruptions implemented; five engineering-v1 levels calibrated on source trainval data and frozen | `corruptions/`, `run_corruption_pilot.py`, `results/corruption_pilot/<dataset>/` |
 
 Roadmap numbering starts at Step 0, so “the first four” means Steps 0, 1, 2,

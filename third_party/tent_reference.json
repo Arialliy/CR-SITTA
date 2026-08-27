@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "purpose": "reference-only",
+  "retrieved_on": "2026-08-26",
+  "upstream": {
+    "name": "Tent: Fully Test-Time Adaptation by Entropy Minimization",
+    "repository_url": "https://github.com/DequanWang/tent.git",
+    "default_branch": "master",
+    "archived": true,
+    "archived_on": "2025-02-15",
+    "commit": "e9e926a668d85244c66a6d5c006efbd2b82e83e8",
+    "tree": "f482757a924f4a61651a37b15e75d0eab2fd3c9e"
+  },
+  "license": {
+    "spdx_id": "MIT",
+    "copyright": "Copyright (c) 2021 Dequan Wang and Evan Shelhamer",
+    "path": "tent/LICENSE",
+    "git_blob_sha1": "e0366f84c498844b25247fb640e1ecba1f22c4fe",
+    "sha256": "c782f284d1caaab37e0022e826622f898b9527c5eec0eba3fa16c0d85f418df6"
+  },
+  "reference_files": [
+    {
+      "path": "tent/norm.py",
+      "role": "behavioral reference for test-time normalization",
+      "git_blob_sha1": "0bf2fc182ecb35a62a94b1be9f9b39613f5b9dc8",
+      "sha256": "2e7cff9f2fe5a7bb50a92e955c31ea55c58eb8b7778f09b129b2ef16c87b285d"
+    }
+  ],
+  "integration": {
+    "mode": "reference-only",
+    "runtime_dependency": false,
+    "direct_import": false,
+    "project_method_name": "AdaBN / Test-Time Norm (single-image episodic batch statistics)",
+    "differences_from_upstream_norm": [
+      "The upstream CIFAR-10-C example uses batches of 200 and resets once per corruption-severity condition; this project processes one segmentation image per episode and restores source state after every image.",
+      "Upstream Norm defaults to track_running_stats=true, so training-mode forwards update BatchNorm running buffers even though current-batch statistics determine each output; this project disables running-stat tracking during the temporary AdaBN forward and requires all running buffers to remain unchanged.",
+      "Upstream configure_model forces BatchNorm eps=1e-5 and momentum=0.1; this project preserves the source checkpoint's BatchNorm eps and momentum values.",
+      "Upstream reset restores only the post-configuration state_dict; this project restores the complete pre-episode source state, including parameters, buffers, module training flags, BatchNorm runtime attributes, requires_grad flags, gradients, and registered extra state.",
+      "This project explicitly keeps every non-BatchNorm module in evaluation mode, freezes all parameters, and performs no backward pass or optimizer step for AdaBN.",
+      "The upstream example is a CIFAR-10 classifier; this project adapts NS-FPN raw binary-segmentation logits through the project model adapter and never exposes labels or ground-truth masks to the episodic method."
+    ]
+  }
+}

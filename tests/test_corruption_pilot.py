@@ -38,7 +38,7 @@ def _make_source_dataset(tmp_path: Path) -> tuple[Path, Path, tuple[str, ...]]:
         mask[3, 3 + (index % 2)] = 255
         Image.fromarray(image, mode="RGB").save(images / f"{image_id}.png")
         Image.fromarray(mask, mode="L").save(masks / f"{image_id}.png")
-    split = tmp_path / "source_trainval.txt"
+    split = tmp_path / "source_train.txt"
     split.write_text("\n".join(image_ids) + "\n", encoding="utf-8")
     return root, split, image_ids
 
@@ -50,7 +50,8 @@ def _pilot_args(
     output_dir: Path,
 ) -> SimpleNamespace:
     return SimpleNamespace(
-        dataset="IRSTD-1k",
+        dataset="IRSTD-1K",
+        protocol=pilot.DEFAULT_PROTOCOL,
         root=root,
         split=split,
         checkpoint=checkpoint,
@@ -59,20 +60,26 @@ def _pilot_args(
         image_size=8,
         seed=42,
         output_dir=output_dir,
+        smoke=True,
     )
 
 
-def test_cli_defaults_to_bounded_official_trainval_protocol() -> None:
+def test_cli_defaults_to_bounded_fixed_train_protocol() -> None:
     parser = pilot.build_argument_parser()
     args = parser.parse_args(
-        ["--dataset", "IRSTD-1k", "--root", "/nonexistent-for-parse-only"]
+        ["--dataset", "IRSTD-1K"]
     )
 
     assert args.split is None
     assert args.subset_size == 64
-    assert pilot.PILOT_DATASET_DEFAULTS["IRSTD-1k"]["split"].name == "trainval.txt"
+    assert (
+        pilot.PILOT_DATASET_DEFAULTS["IRSTD-1K"]["split"].name
+        == "train_IRSTD-1K.txt"
+    )
     assert all(
-        defaults["split"].name == "trainval.txt"
+        defaults["split"].name.startswith("train_")
+        and defaults["split"].parent.name == "img_idx"
+        and defaults["checkpoint"].name == "best_miou.pth.tar"
         for defaults in pilot.PILOT_DATASET_DEFAULTS.values()
     )
     assert len(pilot.DEFAULT_CONDITIONS) == 21
@@ -133,20 +140,20 @@ def test_runner_refuses_any_test_txt_even_when_explicit(tmp_path: Path) -> None:
     checkpoint.write_bytes(b"placeholder")
     args = _pilot_args(root, split, checkpoint, tmp_path / "out")
 
-    with pytest.raises(ValueError, match="refuses test.txt"):
+    with pytest.raises(ValueError, match="refuses a fixed test split"):
         pilot.resolve_pilot_paths(args)
 
 
-def test_official_test_ids_are_detected_even_if_split_was_renamed() -> None:
+def test_fixed_test_ids_are_detected_even_if_split_was_renamed() -> None:
     known_test_id = pilot.read_split_ids(
-        pilot.PILOT_DATASET_DEFAULTS["IRSTD-1k"]["test_split"]
+        pilot.PILOT_DATASET_DEFAULTS["IRSTD-1K"]["test_split"]
     )[0]
 
-    assert pilot.official_test_id_overlap(
-        "IRSTD-1k", ("safe_custom_source_id", known_test_id)
+    assert pilot.fixed_test_id_overlap(
+        "IRSTD-1K", ("safe_custom_source_id", known_test_id)
     ) == (known_test_id,)
-    assert pilot.official_test_id_overlap(
-        "IRSTD-1k", ("safe_custom_source_id",)
+    assert pilot.fixed_test_id_overlap(
+        "IRSTD-1K", ("safe_custom_source_id",)
     ) == ()
 
 
@@ -193,10 +200,12 @@ def test_fake_model_bounded_pilot_writes_metrics_hashes_trends_and_grid(
     result = pilot.run_corruption_pilot(args, conditions=conditions)
 
     assert build_calls == 1
-    assert result["scope"] == "source_domain_only"
+    assert result["scope"] == "fixed_train_corruption_calibration_only"
+    assert result["execution_mode"] == "smoke"
+    assert result["formal_artifact"] is False
     assert len(result["repository_provenance"]["head_commit"]) == 40
     assert "run_corruption_pilot.py" in result["repository_provenance"]["file_sha256"]
-    assert result["split_role"] == "explicit_source_holdout_without_official_test_ids"
+    assert result["split_role"] == "smoke_train_only"
     assert result["condition_count"] == 6
     assert result["full_clean_plus_4x5_protocol"] is False
     expected_selected = pilot.sha256_ranked_subset(image_ids, 2)
@@ -233,8 +242,17 @@ def test_fake_model_bounded_pilot_writes_metrics_hashes_trends_and_grid(
     assert all(len(condition["metrics"]["froc"]) == 21 for condition in result["conditions"])
     assert result["checks"]["model_state_unchanged"] is True
     assert result["checks"]["same_ordered_ids_all_conditions"] is True
-    assert result["checks"]["official_test_ids_absent"] is True
-    assert result["checks"]["official_test_id_overlap_count"] == 0
+    assert result["checks"]["fixed_test_ids_absent"] is True
+    assert result["checks"]["fixed_test_id_overlap_count"] == 0
+    assert result["checks"]["exact_input_reproduction_all_conditions"] is True
+    assert result["checks"]["gt_mask_hash_identical_across_conditions"] is True
+    assert result["checks"]["clean_transform_exact_identity"] is True
+    assert result["checks"]["test_image_open_count"] == 0
+    assert result["checks"]["test_mask_open_count"] == 0
+    assert result["checks"]["io_guard"]["opened_unique_ids"] == 2
+    assert result["checks"]["io_guard"]["forbidden_open_count"] == 0
+    assert all(c["exact_input_reproduction"] for c in result["conditions"])
+    assert all(c["exact_mask_reproduction"] for c in result["conditions"])
     assert result["checks"]["severity_table_unchanged"] is True
     assert result["checks"]["severity_table_automatically_frozen"] is False
     assert set(result["trends"]) == {"gaussian_noise"}
@@ -263,6 +281,8 @@ def test_fake_model_bounded_pilot_writes_metrics_hashes_trends_and_grid(
 
     artifact_path = output_dir / "pilot.json"
     assert artifact_path.is_file()
+    assert (output_dir / "artifact_manifest.json").is_file()
+    assert (output_dir / "COMPLETE.json").is_file()
     written = json.loads(artifact_path.read_text(encoding="utf-8"))
     assert written["selection"]["selected_ids"] == result["selection"]["selected_ids"]
     assert written["conditions"][0]["corruption"] == "clean"

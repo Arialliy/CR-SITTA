@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "purpose": "Binary Episodic TENT behavioral and license reference",
+  "retrieved_on": "2026-08-26",
+  "upstream": {
+    "name": "Tent: Fully Test-Time Adaptation by Entropy Minimization",
+    "repository_url": "https://github.com/DequanWang/tent.git",
+    "commit": "e9e926a668d85244c66a6d5c006efbd2b82e83e8",
+    "archived": true,
+    "license_spdx_id": "MIT"
+  },
+  "reference_files": [
+    {
+      "path": "tent/tent.py",
+      "role": "reference for configuring BN affine adaptation and entropy-minimization updates",
+      "sha256": "d854e1f65f741aa1632dfb55420ca1bcf5405c978bef890e45caad04980514c8"
+    },
+    {
+      "path": "tent/conf.py",
+      "role": "reference for optimizer construction and reset-oriented evaluation flow",
+      "sha256": "2588dc2171ebc9a187dca31a93269e341c062b8df9a69b46196989f8a21a9cc9"
+    },
+    {
+      "path": "tent/LICENSE",
+      "role": "upstream license",
+      "sha256": "c782f284d1caaab37e0022e826622f898b9527c5eec0eba3fa16c0d85f418df6"
+    }
+  ],
+  "integration": {
+    "mode": "reference-only independent reimplementation",
+    "runtime_dependency": false,
+    "direct_import": false,
+    "project_method_name": "Binary Episodic TENT",
+    "project_files": [
+      "tta/binary_tent.py",
+      "tta/binary_tent_runner.py"
+    ],
+    "preserved_principles": [
+      "keep the model globally in evaluation behavior except for the selected BatchNorm protocol",
+      "make only BatchNorm affine weight and bias trainable",
+      "minimize prediction entropy at test time using an optimizer step"
+    ],
+    "project_specific_differences": [
+      "NS-FPN has one binary logit channel, so the objective is Bernoulli entropy of sigmoid(logit), not multiclass softmax entropy",
+      "v1 performs exactly one unconditional optimizer step per image and then executes a fresh post-update forward",
+      "every image begins from and returns to the exact Source model, optimizer, BN runtime, gradients, and RNG state",
+      "both current-image batch statistics (TENT-BS) and Source running statistics (TENT-SS) are exposed as separate mechanisms",
+      "Source-pre, TENT-mode-pre, and TENT-post predictions are retained separately",
+      "ground-truth labels never enter the adaptation method"
+    ]
+  }
+}
