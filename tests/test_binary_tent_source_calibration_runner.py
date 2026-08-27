@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import json
 from pathlib import Path
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -471,3 +472,160 @@ def test_parser_keeps_validate_launcher_and_worker_roles_separate() -> None:
     )
     assert args.role == "worker-stage1"
     assert args.device == "cuda:0"
+
+
+def test_parallel_scheduler_reuses_only_the_gpu_slot_that_completed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    processes: list[object] = []
+    remaining_polls = {"slow": 3, "fast": 0, "next": 0}
+
+    class FakeProcess:
+        def __init__(self, command: list[str], env: dict[str, str]) -> None:
+            self.command = command
+            self.gpu = env["CUDA_VISIBLE_DEVICES"]
+            self.pid = 100 + len(processes)
+            self.reaped = False
+            processes.append(self)
+
+        def poll(self):
+            name = self.command[0]
+            if remaining_polls[name] > 0:
+                remaining_polls[name] -= 1
+                return None
+            return 0
+
+        def wait(self, timeout=None):
+            self.reaped = True
+            return 0
+
+        def terminate(self):
+            raise AssertionError("successful scheduler must not terminate workers")
+
+        def kill(self):
+            raise AssertionError("successful scheduler must not kill workers")
+
+    monkeypatch.setattr(runner.subprocess, "Popen", FakeProcess)
+    assignments = runner._run_parallel(
+        [["slow"], ["fast"], ["next"]],
+        ("1", "2"),
+        poll_interval_seconds=0,
+    )
+
+    assert [value["gpu_id"] for value in assignments] == ["1", "2", "2"]
+    assert [value.gpu for value in processes] == ["1", "2", "2"]
+    assert all(value.reaped for value in processes)
+
+
+def test_parallel_scheduler_failure_terminates_kills_and_waits_every_worker(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    processes: list[object] = []
+
+    class FakeProcess:
+        def __init__(self, command: list[str], env: dict[str, str]) -> None:
+            self.command = command
+            self.pid = 200 + len(processes)
+            self.return_code = 7 if command[0] == "fail" else None
+            self.terminated = False
+            self.killed = False
+            self.waited = False
+            processes.append(self)
+
+        def poll(self):
+            return self.return_code
+
+        def wait(self, timeout=None):
+            if self.return_code is None and timeout is not None:
+                raise runner.subprocess.TimeoutExpired(self.command, timeout)
+            self.waited = True
+            return 0 if self.return_code is None else self.return_code
+
+        def terminate(self):
+            self.terminated = True
+
+        def kill(self):
+            self.killed = True
+            self.return_code = -9
+
+    monkeypatch.setattr(runner.subprocess, "Popen", FakeProcess)
+    with pytest.raises(runner.CalibrationExecutionError, match="worker exited 7"):
+        runner._run_parallel(
+            [["fail"], ["hung"]],
+            ("1", "2"),
+            termination_timeout_seconds=0.001,
+            poll_interval_seconds=0,
+        )
+
+    failed, hung = processes
+    assert failed.waited is True
+    assert hung.terminated is True
+    assert hung.killed is True
+    assert hung.waited is True
+    assert all(value.poll() is not None for value in processes)
+
+
+def test_publish_directory_exclusive_lock_and_atomic_noreplace_races(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    destination = tmp_path / "artifact"
+    entered_rename = threading.Event()
+    release_rename = threading.Event()
+    real_rename = runner._rename_directory_noreplace
+
+    def paused_rename(source: Path, final: Path) -> None:
+        entered_rename.set()
+        assert release_rename.wait(timeout=5)
+        real_rename(source, final)
+
+    monkeypatch.setattr(runner, "_rename_directory_noreplace", paused_rename)
+    failures: list[BaseException] = []
+
+    def publish_first() -> None:
+        try:
+            runner._publish_directory(
+                final=destination,
+                primary_files={"payload.json": {"builder": 1}},
+                manifest_metadata={},
+                completion_metadata={},
+            )
+        except BaseException as error:  # pragma: no cover - assertion reports it
+            failures.append(error)
+
+    thread = threading.Thread(target=publish_first)
+    thread.start()
+    assert entered_rename.wait(timeout=5)
+    with pytest.raises(FileExistsError, match="publish lock already exists"):
+        runner._publish_directory(
+            final=destination,
+            primary_files={"payload.json": {"builder": 2}},
+            manifest_metadata={},
+            completion_metadata={},
+        )
+    release_rename.set()
+    thread.join(timeout=5)
+    assert not thread.is_alive()
+    assert failures == []
+    assert json.loads((destination / "payload.json").read_text())["builder"] == 1
+    assert not destination.with_name(".artifact.publish.lock").exists()
+
+    raced_destination = tmp_path / "appears-during-rename"
+
+    def destination_appears(source: Path, final: Path) -> None:
+        final.mkdir()
+        (final / "winner.txt").write_text("external winner", encoding="utf-8")
+        real_rename(source, final)
+
+    monkeypatch.setattr(runner, "_rename_directory_noreplace", destination_appears)
+    with pytest.raises(FileExistsError, match="refusing overwrite"):
+        runner._publish_directory(
+            final=raced_destination,
+            primary_files={"payload.json": {"builder": "loser"}},
+            manifest_metadata={},
+            completion_metadata={},
+        )
+    assert (raced_destination / "winner.txt").read_text() == "external winner"
+    assert not tuple(tmp_path.glob(".appears-during-rename.build-*"))
+    assert not raced_destination.with_name(
+        ".appears-during-rename.publish.lock"
+    ).exists()
