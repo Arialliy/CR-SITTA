@@ -368,9 +368,9 @@ def _parse_record(value: Any, index: int, expected_stage: int) -> _CellRecord:
     fresh_process = record["fresh_process"]
     if not isinstance(fresh_process, bool):
         raise CalibrationSelectionError(f"{label}.fresh_process must be bool")
-    if stage == 2 and not fresh_process:
+    if not fresh_process:
         raise CalibrationSelectionError(
-            f"{label} stage-2 evidence must come from a fresh process"
+            f"{label} stage-{stage} evidence must come from a fresh process"
         )
 
     candidate_record = _mapping(record["candidate"], f"{label}.candidate")

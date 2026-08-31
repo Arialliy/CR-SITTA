@@ -1,0 +1,234 @@
+schema_version: 2
+execution_protocol_id: cr-sitta-binary-tent-ss-calibration-execution-v2
+created_at: "2026-08-28"
+
+scientific_protocol:
+  path: configs/binary_tent_ss_calibration_v2.yaml
+  sha256: f902ed555a84ca4dbf9d62511afe08764bff074e98c5bfb1c302b93a1e403090
+
+cache_protocol:
+  path: configs/binary_tent_ss_calibration_cache_v2.yaml
+  sha256: e225311cce252125eaf3a2b47eeeea4cde60d0363c8c71f48494d70e41c2aa3e
+  inventory_go_seal_sha256: 99b487241078828129e1566817290f53c186d5988e42c560a719c9701fd7aa0e
+  root: results/binary_tent/ss_calibration_cache_v2
+  require_complete_sentinel: true
+  verify_every_manifest_file_sha256_at_process_entry: true
+  consumer_mode: official_v2_read_only_numpy_mmap_with_private_image_copy
+  target_access: >-
+    opaque integrity bytes are hashed at process entry; target tensor
+    deserialization and indexing occur only after all 64 method episodes in a
+    cell complete
+  artifacts:
+    IRSTD-1K:
+      manifest_sha256: 95d0ee45ccf2f221eea042f96c3bfd3e25dcc736286482ad21f2591176651db6
+      method_input_manifest_sha256: 2144bc9f0e05e38d81c73c0b4a7fa85784c5836f88ea54ddd727e447e7689072
+      complete_sha256: d558459dc6387e45eb0ce64e2e3a9ae773613570f9871b3b9abe97d85121e0f8
+      cache_content_sha256: f3ff4c7b60d53ac1ec553a1b35f6a947be6e2da264a893ef4dff2cce513774c1
+      ordered_ids_sha256: 0ee4400c021dcfb639d813bc20582060a3fff8bb635292e48abf820ce90abb13
+      target_file_sha256: d12a30138fa67c50dbd1f8fa96491517f284263d33e1bfdb9a93989013b3dc1c
+      target_tensor_sequence_sha256: 6c767e81650a0f6a1771018f83f73f1f649db1e4ce3bae85863777edc5bff52f
+    NUAA-SIRST:
+      manifest_sha256: aef94b27929a80cf8b05174862cc688d844a9016867cbee0c9751f105229a76d
+      method_input_manifest_sha256: 5099ea261f977bfabac73283f3b4c6585a50cdab1092a6cce7f31ef31c3adcaa
+      complete_sha256: 171ac30c25ad5a5c8039b7edf82b584c1a180845503c35f85f0175ba58c673f1
+      cache_content_sha256: 0606f8e0f420ad2e268b3dc873e4966b1ab9f2569d85115cfa1dd5863dfc0d12
+      ordered_ids_sha256: a48e5e3f0ec3e6911a74f953e96aa7ea362b2f2f32c37626099afd61f4935baa
+      target_file_sha256: b2ee3015dc3d9e8f4bac60d77aea03646a13249ee4b8bcd1b8d70dc6b033ae41
+      target_tensor_sequence_sha256: b8e3b276b4d78d590496be000656071538ad548c1929bfe06fc9c41369728962
+    NUDT-SIRST:
+      manifest_sha256: bc9ac2caee9647365f58cf21fea30558295889adbb68b8c560779bcc73959e25
+      method_input_manifest_sha256: 02b281fa8ed08906f6b4eab2525b86fc9c45c060d162e9c479cb61dac04f1b8d
+      complete_sha256: 835c873f9d575b31e0947aecb9f8cfa2fc020832c0ab0317db7657e4ec484125
+      cache_content_sha256: 3e9ed0cac6bc5e7257d0d5106c85352c783f302c4e949bd802ec1d5e707740d9
+      ordered_ids_sha256: 5c6c8b441eab5277611fa1007354692df557db311e2d7969e34ebeaba3ae00e4
+      target_file_sha256: 8ee5ce44dfddb346aa05faba27e7424bb4191d886daff0c4c2a50913760a8368
+      target_tensor_sequence_sha256: 23f0b8e4070670c11ccf8b8fc134d41d76a307a101ce2bfe13e77ad08af099b0
+
+hardened_safety_core:
+  path: run_binary_tent_source_calibration.py
+  sha256: a3175ade39e656d04778ff804b8d1d106c01ea44f8390b6c65a2cb8ed7eb4d20
+  import_only_after_sha256_verification: true
+  monkeypatch_forbidden: true
+  api_allow_list:
+    - BoundFile
+    - CacheContext
+    - CalibrationContract
+    - CalibrationExecutionError
+    - RuntimeSeal
+    - RuntimeSealMonitor
+    - _audit_episode
+    - _bound_file
+    - _configure_cuda_worker
+    - _endpoint_counts
+    - _extend_runtime_seal
+    - _fresh_process_id
+    - _gpu_ids
+    - _load_json
+    - _observed_worker_environment
+    - _publish_directory
+    - _run_parallel
+    - _runtime_seal_from_bindings
+    - _safe_slug
+    - _seed_candidate
+    - _stage2_slot_process_id
+    - _validate_formal_gpu_lease
+    - _verify_embedded_gpu_lease
+    - _verify_inherited_gpu_lease
+    - _with_stage_launcher_lock
+    - build_cell_record
+    - run_label_free_episode
+    - verify_shard
+
+execution:
+  seed: 42
+  batch_size: 1
+  num_workers: 0
+  image_size: 256
+  amp_enabled: false
+  diagnostic_detail: global
+  require_nonzero_parameter_update: false
+  zero_parameter_update_policy: allow_only_with_one_finite_optimizer_step_temporary_state_and_exact_reset
+  update_activity_diagnostics:
+    require_nonzero_parameter_update: false
+    zero_parameter_update_policy: allow_only_with_one_finite_optimizer_step_temporary_state_and_exact_reset
+    optimizer_temporary_state_required: true
+    diagnostics_not_used_for_selection: true
+    selector_inputs_exclude_strength_diagnostics: true
+    artifact_filename: lr_strength_diagnostics.jsonl
+    one_record_per_64_image_cell: true
+    computed_before_outer_target_loader: true
+    uses_target_tensor: false
+    probability_transform: metrics.irstd_metrics.probabilities_from_logits
+    changed_pixel_rule: strict_probability_gt_0.5_disagreement
+    relative_step_norm_definition: step_norm/(source_parameter_norm+epsilon)
+    relative_step_norm_epsilon: 1.0e-12
+  device_type: cuda
+  cuda_device_order: PCI_BUS_ID
+  visible_cuda_devices_per_worker: 1
+  deterministic_forwards:
+    algorithms_enabled: true
+    warn_only: false
+    cudnn_deterministic: true
+    cudnn_benchmark: false
+    cublas_workspace_config: ":4096:8"
+  entropy_backward:
+    deterministic_algorithms: temporarily_disabled
+    restore_strict_policy_before_optimizer_step_and_post_forward: true
+  full_state_sha256_audit_cadence: 64
+  force_full_audit_at_every_cell_end: true
+  selection_bn_protocol: source_running_statistics
+  BS_excluded_from_selection: true
+  rebuild_model_method_optimizer_per_dataset: true
+  stage2_candidate_order: frozen_stage1_top3
+  reapply_fixed_seed_before_every_candidate: true
+
+launcher:
+  default_physical_gpu_ids: [1, 2]
+  one_live_worker_per_physical_gpu: true
+  cross_launcher_physical_gpu_lease: crash_recoverable_flock
+  physical_gpu_lease_directory: results/binary_tent/.source_calibration_physical_gpu_leases
+  child_inherits_lease_fd_for_worker_lifetime: true
+  linux_parent_death_signal: SIGTERM
+  worker_parent_pid_guard: true
+  reuse_only_the_slot_whose_worker_completed: true
+  failure_termination_timeout_seconds: 10
+  failure_cleanup: terminate_then_timeout_kill_then_wait_every_live_worker
+  worker_stdout: devnull_launcher_emits_single_receipt
+  worker_stderr: inherited_structured_progress
+  structured_assignment_stderr_event: true
+  lease_wait_heartbeat_seconds: 30
+  stage_launcher_claim: crash_recoverable_flock_scan_run_postverify
+  child_workers_inherit_stage_launcher_claim_fd: true
+  stage1:
+    one_candidate_per_fresh_process: true
+    maximum_parallel_workers: 2
+    cells_per_process: 39
+    episodes_per_process: 2496
+    safe_resume_current_runtime_seal_only: true
+    invalid_or_old_seal_action: fail_closed_without_delete
+  stage2:
+    fresh_process_count: 2
+    each_process_runs_all_top3_sequentially: true
+    cells_per_process: 117
+    episodes_per_process: 7488
+    top3_receipt: stage1/aggregate/stage1_ss_top3_receipt.json
+    deterministic_shard_paths: stage2/shards/stage2-{receipt_sha256}-slot-{1,2}
+    safe_resume_current_extended_runtime_seal_only: true
+    verify_stage1_aggregate_before_receipt_use: true
+    bind_receipt_in_process_entry_runtime_seal: true
+
+runtime_seal:
+  algorithm: calibration-runtime-seal-v1
+  full_byte_hash_at_process_entry: true
+  target_integrity_bytes_hashed_before_adaptation: true
+  target_tensor_deserialized_or_indexed_only_after_all_cell_episodes_complete: true
+  best_pd_checkpoint_bound_without_model_load: true
+  best_pd_reuses_same_frozen_hyperparameters_without_tuning: true
+  zero_parameter_update_policy_bound: true
+  update_activity_diagnostics_bound_and_ranking_excluded: true
+  stage2_top3_receipt_bound_with_canonical_role: stage1_top3_receipt:ss_v2
+  inventory_go_seal_sha256: 99b487241078828129e1566817290f53c186d5988e42c560a719c9701fd7aa0e
+  critical_code_paths:
+    - run_binary_tent_ss_calibration_v2.py
+    - run_binary_tent_source_calibration.py
+    - configs/retrain_fixed_splits.yaml
+    - materialize_binary_tent_ss_calibration_cache_v2.py
+    - tta/binary_tent_ss_calibration_selector_v2.py
+    - tta/binary_tent_calibration_selector.py
+    - tta/binary_tent_fast_runner_v2.py
+    - tta/binary_tent_fast_runner.py
+    - tta/binary_tent_runner.py
+    - tta/binary_tent.py
+    - tta/state_manager.py
+    - tta/model_adapter.py
+    - metrics/irstd_metrics.py
+    - metrics/connected_components.py
+    - metrics/target_matching.py
+    - dataio/corruption_cache.py
+    - dataio/train_side_pilot_protocol.py
+    - dataio/research_dataset.py
+    - corruptions/corruption_protocol.py
+    - corruptions/infrared_corruptions.py
+    - model/MSHNet_NSFPN.py
+    - model/NS_FPN.py
+    - model/diff_cross_attns.py
+    - SFS_MSDeformAttn/ops/functions/ms_deform_attn_func.py
+    - SFS_MSDeformAttn/ops/modules/ms_deform_attn.py
+    - .conda/lib/python3.10/site-packages/MultiScaleDeformableAttention.cpython-310-x86_64-linux-gnu.so
+    - test_source.py
+
+evaluation:
+  evaluator: metrics.irstd_metrics.UnifiedResearchEvaluator
+  froc_probability_thresholds: [0.5]
+  fixed_probability_threshold: 0.5
+  threshold_rule: strict_greater_than
+  target_threshold_rule: strict_greater_than
+  prediction_threshold_rule: strict_greater_than
+  connectivity: 2
+  max_centroid_distance: 3.0
+  centroid_distance_eligibility_rule: strict_less_than
+  min_component_area: 1
+  target_components: connected_components_of_strictly_positive_target_mask
+  prediction_components: connected_components_after_probability_strict_greater_than_threshold
+  matching: one_to_one_minimum_total_centroid_distance_over_eligible_pairs
+  detected_targets: matched_target_components
+  total_targets: target_connected_component_count
+  false_alarm_pixels: sum_area_of_unmatched_prediction_components
+  retain_only_integer_sufficient_statistics: true
+  target_transition_fields_forbidden: true
+
+outputs:
+  root: results/binary_tent/ss_calibration_v2
+  publication_work_root: results/binary_tent/.ss_calibration_v2_publication_work
+  refuse_overwrite: true
+  atomic_same_filesystem_cross_directory_staging: true
+  shard_manifest: artifact_manifest.json
+  shard_complete: COMPLETE.json
+  records_filename: records.jsonl
+  update_activity_diagnostics_filename: lr_strength_diagnostics.jsonl
+  stage1_aggregate_directory: stage1/aggregate
+  stage2_aggregate_directory: final/aggregate
+  provenance_scope:
+    paper_result: false
+    source_train_derived: true
+  inherited_source_limitation_required: true

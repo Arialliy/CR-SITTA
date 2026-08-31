@@ -1,0 +1,154 @@
+{
+  "checkpoint_anchor": {
+    "best_pd_policy": "reuse_same_frozen_hyperparameters_without_additional_tuning",
+    "disclosure": "The locked best_miou checkpoint anchor was selected by repeated evaluation on the fixed test split during source training. This Pilot reads only the fixed test ID text for leakage guards and opens no test image or mask.",
+    "role": "best_miou",
+    "selection": "test_selected"
+  },
+  "datasets": {
+    "IRSTD-1K": {
+      "checks": {
+        "output_ids_contained_in_train": true,
+        "output_ids_unique": true,
+        "output_test_overlap_count": 0,
+        "parent_pilot_ids_contained_in_train": true,
+        "parent_pilot_ids_unique": true,
+        "parent_pilot_output_overlap_count": 0,
+        "parent_pilot_test_overlap_count": 0,
+        "test_ids_unique": true,
+        "train_ids_unique": true,
+        "train_test_overlap_count": 0
+      },
+      "output": {
+        "count": 64,
+        "file_sha256": "b66b914ac8a2177a127a2363245c82df29395f97dfe0745c802fd7211f3b988e",
+        "ordered_ids_sha256": "0ee4400c021dcfb639d813bc20582060a3fff8bb635292e48abf820ce90abb13",
+        "path": "configs/tta_train_side_pilot_v2/IRSTD-1K.txt"
+      },
+      "round_02_parent_pilot": {
+        "artifact": "results/corruption_pilot_fixed_split/round_02/IRSTD-1K/pilot.json",
+        "artifact_sha256": "627028aa4e9a903a14ac9298bcca7bcfbd6c90d7de06c9bd786a380aed7eda67",
+        "complete": "results/corruption_pilot_fixed_split/round_02/IRSTD-1K/COMPLETE.json",
+        "complete_sha256": "845a11982c57ce9529aca9ab4ba8ddf3e7f54d15145dd0be77c75a61d1239433",
+        "manifest": "results/corruption_pilot_fixed_split/round_02/IRSTD-1K/artifact_manifest.json",
+        "manifest_sha256": "5aa55b3206be25e6f65a499ed0e13541added597dc31770546a0f26456242ca5",
+        "ordered_ids_sha256": "09a27c1d085bb5816da442fbcd50998b9716d757ad9cc914d86e75d9ea0978d6",
+        "protocol_sha256": "62d825a2497da671de2bb6b54d5e85e96992a670404ad07c860a8bdf4ab16c5e"
+      },
+      "test_split": {
+        "count": 201,
+        "metadata_only": true,
+        "path": "datasets/IRSTD-1K/img_idx/test_IRSTD-1K.txt",
+        "sha256": "8c71e474358acb84f2cbebfd1282ffea236f9cb852b7f7c04feb2fd99804c579"
+      },
+      "train_split": {
+        "count": 800,
+        "path": "datasets/IRSTD-1K/img_idx/train_IRSTD-1K.txt",
+        "sha256": "689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744"
+      }
+    },
+    "NUAA-SIRST": {
+      "checks": {
+        "output_ids_contained_in_train": true,
+        "output_ids_unique": true,
+        "output_test_overlap_count": 0,
+        "parent_pilot_ids_contained_in_train": true,
+        "parent_pilot_ids_unique": true,
+        "parent_pilot_output_overlap_count": 0,
+        "parent_pilot_test_overlap_count": 0,
+        "test_ids_unique": true,
+        "train_ids_unique": true,
+        "train_test_overlap_count": 0
+      },
+      "output": {
+        "count": 64,
+        "file_sha256": "f15f46a4f095689e126391973b1a8a216ffcb8c6330e4f348defe691ee3a369f",
+        "ordered_ids_sha256": "a48e5e3f0ec3e6911a74f953e96aa7ea362b2f2f32c37626099afd61f4935baa",
+        "path": "configs/tta_train_side_pilot_v2/NUAA-SIRST.txt"
+      },
+      "round_02_parent_pilot": {
+        "artifact": "results/corruption_pilot_fixed_split/round_02/NUAA-SIRST/pilot.json",
+        "artifact_sha256": "e32db90428b0e061493542ea32e6b4a99f7ea9e8a9cec3d0cb62bbe72ae929c7",
+        "complete": "results/corruption_pilot_fixed_split/round_02/NUAA-SIRST/COMPLETE.json",
+        "complete_sha256": "a2decf1a435a46c6d12fbb83662c64ce15b49cb9cfe5f74d66db048a2bcd4117",
+        "manifest": "results/corruption_pilot_fixed_split/round_02/NUAA-SIRST/artifact_manifest.json",
+        "manifest_sha256": "be924449fc16864b29a9163acde28208afbcea35a51fe7ea9f675393c2bcc725",
+        "ordered_ids_sha256": "97c12e4fccb20c9a8df2a3c4c5d57ba3ebd3b6bef636a51d0af3a503334ba346",
+        "protocol_sha256": "62d825a2497da671de2bb6b54d5e85e96992a670404ad07c860a8bdf4ab16c5e"
+      },
+      "test_split": {
+        "count": 214,
+        "metadata_only": true,
+        "path": "datasets/NUAA-SIRST/img_idx/test_NUAA-SIRST.txt",
+        "sha256": "e49023203a323c247306b314f23c8b3b917093a26984067792355adff7a8386e"
+      },
+      "train_split": {
+        "count": 213,
+        "path": "datasets/NUAA-SIRST/img_idx/train_NUAA-SIRST.txt",
+        "sha256": "324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4"
+      }
+    },
+    "NUDT-SIRST": {
+      "checks": {
+        "output_ids_contained_in_train": true,
+        "output_ids_unique": true,
+        "output_test_overlap_count": 0,
+        "parent_pilot_ids_contained_in_train": true,
+        "parent_pilot_ids_unique": true,
+        "parent_pilot_output_overlap_count": 0,
+        "parent_pilot_test_overlap_count": 0,
+        "test_ids_unique": true,
+        "train_ids_unique": true,
+        "train_test_overlap_count": 0
+      },
+      "output": {
+        "count": 64,
+        "file_sha256": "c9eebc3a23f94d0c01bd56a21c7a58475947fa53b72021d05668b1a901ded74b",
+        "ordered_ids_sha256": "5c6c8b441eab5277611fa1007354692df557db311e2d7969e34ebeaba3ae00e4",
+        "path": "configs/tta_train_side_pilot_v2/NUDT-SIRST.txt"
+      },
+      "round_02_parent_pilot": {
+        "artifact": "results/corruption_pilot_fixed_split/round_02/NUDT-SIRST/pilot.json",
+        "artifact_sha256": "d5bd0c896ccb993fd1dd8384352597489017c870f258a53411dba706f35390e7",
+        "complete": "results/corruption_pilot_fixed_split/round_02/NUDT-SIRST/COMPLETE.json",
+        "complete_sha256": "da44c220ccbfbab510f1632dd494e7c3b602be4ebebf1b7ba749d0275bc7b925",
+        "manifest": "results/corruption_pilot_fixed_split/round_02/NUDT-SIRST/artifact_manifest.json",
+        "manifest_sha256": "0a170c5ea61e280e3f1d6a6c477fe208ec9880bd7865503b51c1cf080659c914",
+        "ordered_ids_sha256": "19cab65e6d89fd2861f00f04f985ea5e293e7b8924cd6077f1f13983379e9dfb",
+        "protocol_sha256": "62d825a2497da671de2bb6b54d5e85e96992a670404ad07c860a8bdf4ab16c5e"
+      },
+      "test_split": {
+        "count": 664,
+        "metadata_only": true,
+        "path": "datasets/NUDT-SIRST/img_idx/test_NUDT-SIRST.txt",
+        "sha256": "a463c52ee64b1c803c4a322fe090aaf6bc360844898e3943bb7c64a8e551b86e"
+      },
+      "train_split": {
+        "count": 663,
+        "path": "datasets/NUDT-SIRST/img_idx/train_NUDT-SIRST.txt",
+        "sha256": "e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3"
+      }
+    }
+  },
+  "metadata_io_boundary": {
+    "images_opened": 0,
+    "masks_opened": 0,
+    "read_id_text_only": true,
+    "read_parent_pilot_metadata_only": true,
+    "test_pixels_opened": 0
+  },
+  "no_validation_split": true,
+  "paper_result": false,
+  "protocol": {
+    "path": "configs/tta_train_side_calibration_pilot_v2.yaml",
+    "sha256": "3a35f2107786815ef8e7b053e1c220406f9bf2d095f59bccdc5822e16be9ab96"
+  },
+  "protocol_id": "cr-sitta-tta-train-side-calibration-pilot-v2",
+  "schema_version": 2,
+  "scope": "source_train_side_method_calibration",
+  "selection": {
+    "parent_exclusion_role": "round_02_corruption_severity_pilot_64",
+    "rule": "exclude_round_02_corruption_severity_pilot_then_ascending_sha256_of_utf8_canonical_image_id_then_id",
+    "subset_size_per_dataset": 64
+  }
+}

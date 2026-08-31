@@ -125,6 +125,18 @@ evaluation:
   probability_transform: sigmoid_once
   fixed_probability_threshold: 0.5
   threshold_rule: strict_greater_than
+  target_threshold_rule: strict_greater_than
+  prediction_threshold_rule: strict_greater_than
+  connectivity: 2
+  max_centroid_distance: 3.0
+  centroid_distance_eligibility_rule: strict_less_than
+  min_component_area: 1
+  target_components: connected_components_of_strictly_positive_target_mask
+  prediction_components: connected_components_after_probability_strict_greater_than_threshold
+  matching: one_to_one_minimum_total_centroid_distance_over_eligible_pairs
+  detected_targets: matched_target_components
+  total_targets: target_connected_component_count
+  false_alarm_pixels: sum_area_of_unmatched_prediction_components
   target_transition_metrics_used_for_selection: false
   selector_cell: dataset_x_bn_protocol_x_condition
   cells_per_candidate_run: 78

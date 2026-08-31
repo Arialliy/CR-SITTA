@@ -12,27 +12,32 @@ The executable has deliberately narrow process roles:
   call the pure exact-rational selector;
 * the two ``launch-*`` roles are lightweight two-GPU subprocess schedulers.
 
-Targets live behind an outer-evaluator reader.  A method call receives only a
-private image tensor and safe metadata; the corresponding target slice is not
-read until that episode has returned.
+Targets live behind an outer-evaluator reader.  Their files are read only as
+opaque bytes for process-entry integrity hashing; no target tensor is
+deserialized or indexed until every method episode in the cell has returned.
+A method call receives only a private image tensor and safe metadata.
 """
 
 from __future__ import annotations
 
 import argparse
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from decimal import Decimal
 import ctypes
 import errno
+import fcntl
 import hashlib
 import json
 import math
 import os
 from pathlib import Path
+import platform
 import random
 import re
+import signal
 import shutil
+import stat as stat_module
 import subprocess
 import sys
 import time
@@ -98,8 +103,11 @@ EXPECTED_CACHE_PROTOCOL_ID = (
 )
 JSON_SEPARATORS = (",", ":")
 PROCESS_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+CANONICAL_PHYSICAL_GPU_ID_RE = re.compile(r"(?:0|[1-9][0-9]*)", re.ASCII)
 AT_FDCWD = -100
 RENAME_NOREPLACE = 1
+PR_SET_PDEATHSIG = 1
+PR_GET_PDEATHSIG = 2
 SCOPE = {"paper_result": False, "source_train_derived": True}
 
 
@@ -139,6 +147,7 @@ class CalibrationContract:
     cache_protocol: Mapping[str, Any]
     cache_root: Path
     output_root: Path
+    publication_work_root: Path
     critical_code_paths: tuple[Path, ...]
     checkpoints: Mapping[str, Path]
 
@@ -149,6 +158,7 @@ class RuntimeSeal:
     algorithm: str
     bindings: tuple[BoundFile, ...]
     cache_lineage: Mapping[str, Any]
+    runtime_environment: Mapping[str, Any]
     global_runtime_seal_sha256: str
 
     def to_dict(self) -> dict[str, Any]:
@@ -157,6 +167,7 @@ class RuntimeSeal:
             "algorithm": self.algorithm,
             "bindings": [asdict(value) for value in self.bindings],
             "cache_lineage": dict(self.cache_lineage),
+            "runtime_environment": dict(self.runtime_environment),
             "global_runtime_seal_sha256": self.global_runtime_seal_sha256,
         }
 
@@ -221,6 +232,16 @@ def _safe_slug(value: str) -> str:
             "process_id must match [A-Za-z0-9][A-Za-z0-9_.-]{0,127}"
         )
     return value
+
+
+def _canonical_physical_gpu_id(value: Any, *, label: str) -> str:
+    if not isinstance(value, str) or CANONICAL_PHYSICAL_GPU_ID_RE.fullmatch(value) is None:
+        raise CalibrationExecutionError(
+            f"{label} must be canonical ASCII decimal (0 or nonzero digit followed by digits)"
+        )
+    canonical = str(int(value, 10))
+    _require_equal(value, canonical, f"{label} canonical decimal")
+    return canonical
 
 
 def _decimal_text(value: Decimal) -> str:
@@ -333,6 +354,22 @@ def _validate_scientific(scientific: Mapping[str, Any]) -> None:
     evaluation = _mapping(scientific.get("evaluation"), "scientific.evaluation")
     _require_equal(evaluation.get("fixed_probability_threshold"), 0.5, "threshold")
     _require_equal(evaluation.get("threshold_rule"), "strict_greater_than", "threshold rule")
+    for key, expected in (
+        ("target_threshold_rule", "strict_greater_than"),
+        ("prediction_threshold_rule", "strict_greater_than"),
+        ("connectivity", 2),
+        ("max_centroid_distance", 3.0),
+        ("centroid_distance_eligibility_rule", "strict_less_than"),
+        ("min_component_area", 1),
+        (
+            "matching",
+            "one_to_one_minimum_total_centroid_distance_over_eligible_pairs",
+        ),
+        ("detected_targets", "matched_target_components"),
+        ("total_targets", "target_connected_component_count"),
+        ("false_alarm_pixels", "sum_area_of_unmatched_prediction_components"),
+    ):
+        _require_equal(evaluation.get(key), expected, f"scientific.evaluation.{key}")
     _require_equal(
         tuple(evaluation.get("forbidden_selector_inputs", ())),
         ("ATER", "ATRR", "NTG", "target_erasure", "target_recovery", "target_transitions"),
@@ -451,6 +488,7 @@ def load_contract(path: str | Path = DEFAULT_EXECUTION_CONFIG) -> CalibrationCon
         ("image_size", 256),
         ("amp_enabled", False),
         ("device_type", "cuda"),
+        ("cuda_device_order", "PCI_BUS_ID"),
         ("visible_cuda_devices_per_worker", 1),
         ("full_state_sha256_audit_cadence", 64),
         ("force_full_audit_at_every_cell_end", True),
@@ -472,6 +510,22 @@ def load_contract(path: str | Path = DEFAULT_EXECUTION_CONFIG) -> CalibrationCon
     evaluation = _mapping(execution.get("evaluation"), "execution evaluation")
     _require_equal(evaluation.get("froc_probability_thresholds"), [0.5], "FROC thresholds")
     _require_equal(evaluation.get("fixed_probability_threshold"), 0.5, "fixed threshold")
+    for key, expected in (
+        ("target_threshold_rule", "strict_greater_than"),
+        ("prediction_threshold_rule", "strict_greater_than"),
+        ("connectivity", 2),
+        ("max_centroid_distance", 3.0),
+        ("centroid_distance_eligibility_rule", "strict_less_than"),
+        ("min_component_area", 1),
+        (
+            "matching",
+            "one_to_one_minimum_total_centroid_distance_over_eligible_pairs",
+        ),
+        ("detected_targets", "matched_target_components"),
+        ("total_targets", "target_connected_component_count"),
+        ("false_alarm_pixels", "sum_area_of_unmatched_prediction_components"),
+    ):
+        _require_equal(evaluation.get(key), expected, f"execution.evaluation.{key}")
     _require_equal(evaluation.get("target_transition_fields_forbidden"), True, "transition firewall")
     _require_equal(evaluation.get("entropy_hard_gate"), False, "entropy hard gate")
     _require_equal(evaluation.get("performance_hard_gate"), False, "performance hard gate")
@@ -515,6 +569,7 @@ def load_contract(path: str | Path = DEFAULT_EXECUTION_CONFIG) -> CalibrationCon
     )
     outputs = _mapping(execution["outputs"], "execution outputs")
     output_root = _project_path(str(outputs["root"]))
+    publication_work_root = _project_path(str(outputs["publication_work_root"]))
     _require_equal(
         str(output_root.relative_to(PROJECT_ROOT)),
         scientific["outputs"]["root"],
@@ -525,11 +580,79 @@ def load_contract(path: str | Path = DEFAULT_EXECUTION_CONFIG) -> CalibrationCon
         "stage1/aggregate",
         "stage1 aggregate directory",
     )
+    _require_equal(
+        outputs.get("stage2_aggregate_directory"),
+        "final/aggregate",
+        "stage2 aggregate directory",
+    )
+    for key in ("stage1_aggregate_directory", "stage2_aggregate_directory"):
+        resolved_destination = (output_root / str(outputs[key])).resolve()
+        if not resolved_destination.is_relative_to(output_root):
+            raise CalibrationExecutionError(
+                f"outputs.{key} escapes the formal output root"
+            )
+    _require_equal(
+        publication_work_root,
+        (output_root.parent / ".source_calibration_publication_work").resolve(),
+        "publication work root",
+    )
+    if publication_work_root.exists() and (
+        not publication_work_root.is_dir() or publication_work_root.is_symlink()
+    ):
+        raise CalibrationExecutionError(
+            "publication work root must be a real directory when present"
+        )
+    if publication_work_root == output_root or publication_work_root.is_relative_to(
+        output_root
+    ):
+        raise CalibrationExecutionError(
+            "publication work root must remain outside the formal output root"
+        )
+    for key, expected in (
+        ("refuse_overwrite", True),
+        ("atomic_same_filesystem_cross_directory_staging", True),
+        (
+            "publication_lock",
+            "durable_recoverable_flock_on_o_excl_created_control_file",
+        ),
+        ("stale_publication_work_entries_do_not_block_safe_resume", True),
+    ):
+        _require_equal(outputs.get(key), expected, f"outputs.{key}")
     launcher = _mapping(execution.get("launcher"), "launcher")
     _require_equal(
         launcher.get("one_live_worker_per_physical_gpu"),
         True,
         "launcher GPU slot exclusivity",
+    )
+    _require_equal(
+        launcher.get("cross_launcher_physical_gpu_lease"),
+        "crash_recoverable_flock",
+        "cross-launcher physical GPU lease",
+    )
+    for key, expected in (
+        ("child_inherits_lease_fd_for_worker_lifetime", True),
+        ("linux_parent_death_signal", "SIGTERM"),
+        ("worker_parent_pid_guard", True),
+        ("worker_stdout", "devnull_launcher_emits_single_receipt"),
+        ("worker_stderr", "inherited_structured_progress"),
+        ("structured_assignment_stderr_event", True),
+        ("stage_launcher_claim", "crash_recoverable_flock_scan_run_postverify"),
+        ("child_workers_inherit_stage_launcher_claim_fd", True),
+    ):
+        _require_equal(launcher.get(key), expected, f"launcher.{key}")
+    lease_wait_heartbeat_seconds = launcher.get("lease_wait_heartbeat_seconds")
+    if (
+        isinstance(lease_wait_heartbeat_seconds, bool)
+        or not isinstance(lease_wait_heartbeat_seconds, (int, float))
+        or float(lease_wait_heartbeat_seconds) <= 0
+    ):
+        raise CalibrationExecutionError(
+            "launcher.lease_wait_heartbeat_seconds must be positive"
+        )
+    _require_equal(
+        _project_path(str(launcher.get("physical_gpu_lease_directory"))),
+        (output_root.parent / ".source_calibration_physical_gpu_leases").resolve(),
+        "launcher physical GPU lease directory",
     )
     termination_timeout = launcher.get("failure_termination_timeout_seconds")
     if (
@@ -562,6 +685,16 @@ def load_contract(path: str | Path = DEFAULT_EXECUTION_CONFIG) -> CalibrationCon
         True,
         "stage2 aggregate verification policy",
     )
+    _require_equal(
+        stage2_launcher.get("safe_resume_current_extended_runtime_seal_only"),
+        True,
+        "stage2 safe-resume policy",
+    )
+    _require_equal(
+        stage2_launcher.get("invalid_or_old_seal_or_unexpected_entry_action"),
+        "fail_closed_without_delete",
+        "stage2 invalid-shard policy",
+    )
     smoke = _mapping(execution.get("gpu_smoke"), "gpu smoke")
     for key, expected in (
         ("publishes_formal_output", False),
@@ -574,6 +707,28 @@ def load_contract(path: str | Path = DEFAULT_EXECUTION_CONFIG) -> CalibrationCon
         ("bn_protocols", list(BN_PROTOCOLS)),
     ):
         _require_equal(smoke.get(key), expected, f"gpu_smoke.{key}")
+    for key, expected in (
+        ("target_integrity_bytes_hashed_before_adaptation", True),
+        (
+            "target_tensor_deserialized_or_indexed_only_after_all_cell_episodes_complete",
+            True,
+        ),
+    ):
+        _require_equal(runtime.get(key), expected, f"runtime_seal.{key}")
+    environment_summary = _mapping(
+        runtime.get("environment_summary"), "runtime seal environment summary"
+    )
+    for key in (
+        "python",
+        "torch",
+        "compiled_cuda",
+        "compiled_cudnn",
+        "platform",
+        "worker_device_contract",
+    ):
+        _require_equal(
+            environment_summary.get(key), True, f"runtime environment.{key}"
+        )
     _require_equal(
         dict(_mapping(outputs.get("provenance_scope"), "output provenance scope")),
         SCOPE,
@@ -593,6 +748,7 @@ def load_contract(path: str | Path = DEFAULT_EXECUTION_CONFIG) -> CalibrationCon
         cache_protocol=cache_protocol,
         cache_root=cache_root,
         output_root=output_root,
+        publication_work_root=publication_work_root,
         critical_code_paths=critical,
         checkpoints=checkpoints,
     )
@@ -1051,28 +1207,85 @@ def _verify_cache_context(
         "gt_hashes_equal_parent_pilot": True,
         "sanitized_manifest_semantically_equal_outer_projection": True,
         "all_manifest_file_sha256_verified": True,
+        "target_integrity_bytes_hashed_before_adaptation": True,
+        "target_tensor_deserialized_or_indexed_during_seal_capture": False,
     }
     return context, tuple(bindings), lineage
 
 
+def _runtime_environment_contract(
+    contract: CalibrationContract | None = None,
+) -> dict[str, Any]:
+    """Return a stable build/runtime summary safe to share across GPU slots."""
+
+    worker_contract: dict[str, Any] = {
+        "device_type": "cuda",
+        "cuda_device_order": "PCI_BUS_ID",
+        "visible_cuda_devices_per_worker": 1,
+        "logical_worker_device": "cuda:0",
+    }
+    if contract is not None:
+        execution = _mapping(contract.execution["execution"], "execution")
+        worker_contract = {
+            "device_type": str(execution["device_type"]),
+            "cuda_device_order": str(execution["cuda_device_order"]),
+            "visible_cuda_devices_per_worker": int(
+                execution["visible_cuda_devices_per_worker"]
+            ),
+            "logical_worker_device": "cuda:0",
+        }
+    cudnn_version = torch.backends.cudnn.version()
+    return {
+        "python": {
+            "implementation": platform.python_implementation(),
+            "version": platform.python_version(),
+            "executable": str(Path(sys.executable).resolve()),
+        },
+        "torch": {
+            "version": str(torch.__version__),
+            "compiled_cuda": None
+            if torch.version.cuda is None
+            else str(torch.version.cuda),
+            "compiled_cudnn": None
+            if cudnn_version is None
+            else int(cudnn_version),
+        },
+        "platform": {
+            "system": platform.system(),
+            "release": platform.release(),
+            "machine": platform.machine(),
+        },
+        "worker_device_contract": worker_contract,
+    }
+
+
 def _runtime_seal_from_bindings(
-    bindings: Sequence[BoundFile], cache_lineage: Mapping[str, Any]
+    bindings: Sequence[BoundFile],
+    cache_lineage: Mapping[str, Any],
+    runtime_environment: Mapping[str, Any] | None = None,
 ) -> RuntimeSeal:
     paths = [value.path for value in bindings]
     if len(paths) != len(set(paths)):
         raise CalibrationExecutionError("runtime seal contains duplicate file bindings")
     ordered = tuple(sorted(bindings, key=lambda value: value.path))
+    environment = dict(
+        _runtime_environment_contract()
+        if runtime_environment is None
+        else runtime_environment
+    )
     body = {
         "schema_version": 1,
         "algorithm": "calibration-runtime-seal-v1",
         "bindings": [asdict(value) for value in ordered],
         "cache_lineage": dict(cache_lineage),
+        "runtime_environment": environment,
     }
     return RuntimeSeal(
         schema_version=1,
         algorithm="calibration-runtime-seal-v1",
         bindings=ordered,
         cache_lineage=dict(cache_lineage),
+        runtime_environment=environment,
         global_runtime_seal_sha256=_canonical_json_sha256(body),
     )
 
@@ -1083,7 +1296,9 @@ def _extend_runtime_seal(
     """Extend a just-captured entry seal without weakening any base binding."""
 
     return _runtime_seal_from_bindings(
-        (*seal.bindings, *additional_bindings), seal.cache_lineage
+        (*seal.bindings, *additional_bindings),
+        seal.cache_lineage,
+        seal.runtime_environment,
     )
 
 
@@ -1117,7 +1332,9 @@ def capture_runtime_seal(
         caches[dataset] = context
         cache_lineage[dataset] = lineage
         bindings.extend(cache_bindings)
-    return _runtime_seal_from_bindings(bindings, cache_lineage), caches
+    return _runtime_seal_from_bindings(
+        bindings, cache_lineage, _runtime_environment_contract(contract)
+    ), caches
 
 
 class RuntimeSealMonitor:
@@ -1250,11 +1467,15 @@ def build_cell_record(
     severity: int,
     tent_pre: Mapping[str, int],
     tent_post: Mapping[str, int],
+    hard_gates: Mapping[str, bool],
     protocol_audit: Mapping[str, bool],
     image_count: int = IMAGES_PER_CELL,
 ) -> dict[str, Any]:
     """Build the selector-facing record with exactly the frozen hard gates."""
 
+    _require_equal(set(hard_gates), set(REQUIRED_HARD_GATES), "hard gate set")
+    if not all(value is True for value in hard_gates.values()):
+        raise CalibrationExecutionError("cannot emit a failed hard gate")
     _require_equal(set(protocol_audit), set(REQUIRED_PROTOCOL_AUDIT), "protocol audit set")
     if not all(protocol_audit.values()):
         raise CalibrationExecutionError("cannot emit a failed protocol audit")
@@ -1272,7 +1493,7 @@ def build_cell_record(
         "test_image_opens": 0,
         "test_label_opens": 0,
         "method_label_accesses": 0,
-        "hard_gates": {key: True for key in REQUIRED_HARD_GATES},
+        "hard_gates": dict(hard_gates),
         "protocol_audit": dict(protocol_audit),
         "endpoints": {
             "tent_pre": {key: int(value) for key, value in tent_pre.items()},
@@ -1289,8 +1510,14 @@ def _configure_cuda_worker(contract: CalibrationContract, device_text: str) -> t
         raise CalibrationExecutionError(
             f"GPU worker requires CUBLAS_WORKSPACE_CONFIG={expected_workspace}"
         )
-    if not device_text.startswith("cuda"):
-        raise CalibrationExecutionError("calibration workers are CUDA-only")
+    if os.environ.get("CUDA_DEVICE_ORDER") != "PCI_BUS_ID":
+        raise CalibrationExecutionError(
+            "GPU worker requires CUDA_DEVICE_ORDER=PCI_BUS_ID at process entry"
+        )
+    if device_text != "cuda:0":
+        raise CalibrationExecutionError(
+            "calibration workers require isolated logical device cuda:0"
+        )
     if not torch.cuda.is_available():
         raise CalibrationExecutionError("CUDA is unavailable")
     if torch.cuda.device_count() != 1:
@@ -1371,7 +1598,7 @@ def _audit_episode(
     *,
     bn_protocol: str,
     expect_full_audit: bool,
-) -> None:
+) -> dict[str, bool]:
     diagnostics = result.diagnostics
     checks = result.checks
     required_checks = (
@@ -1392,7 +1619,8 @@ def _audit_episode(
         "input_unchanged",
         "rng_restored",
     )
-    if any(checks.get(key) is not True for key in required_checks):
+    required_checks_valid = all(checks.get(key) is True for key in required_checks)
+    if not required_checks_valid:
         raise CalibrationExecutionError("Binary TENT fast episode invariant failed")
     if diagnostics.get("bn_protocol") != bn_protocol:
         raise CalibrationExecutionError("Binary TENT BN protocol drift")
@@ -1403,8 +1631,13 @@ def _audit_episode(
         result.logits_tent_pre,
         result.logits_tent_post,
     )
-    if not all(bool(torch.isfinite(value).all()) for value in finite_values):
+    finite_logits = all(bool(torch.isfinite(value).all()) for value in finite_values)
+    if not finite_logits:
         raise CalibrationExecutionError("episode returned NaN/Inf logits")
+    finite_diagnostics = all(
+        math.isfinite(float(diagnostics.get(key, math.nan)))
+        for key in ("entropy_pre", "entropy_post", "gradient_norm", "step_norm")
+    )
     for key in ("entropy_pre", "entropy_post", "gradient_norm", "step_norm"):
         if not math.isfinite(float(diagnostics.get(key, math.nan))):
             raise CalibrationExecutionError(f"non-finite episode diagnostic: {key}")
@@ -1430,6 +1663,39 @@ def _audit_episode(
             raise CalibrationExecutionError("cell-end full audit was not cadence-driven")
         if result.reset_full_fingerprint is None:
             raise CalibrationExecutionError("cell-end reset fingerprint is missing")
+    exact_reset = all(
+        checks.get(key) is True
+        for key in (
+            "post_forward_state_unchanged",
+            "all_gradients_cleared",
+            "source_runtime_restored_per_image",
+            "bn_affine_restored_per_image",
+            "optimizer_restored_per_image",
+            "input_unchanged",
+            "rng_restored",
+        )
+    )
+    source_identity = all(
+        checks.get(key) is True
+        for key in (
+            "source_pre_no_grad",
+            "non_bn_parameters_exact_every_gate",
+            "all_registered_buffers_exact_every_gate",
+            "parameter_module_optimizer_topology_exact_every_gate",
+        )
+    )
+    tent_pre_identity = checks.get("tent_pre_detached") is True and (
+        bn_protocol != BN_PROTOCOL_SOURCE_STATS or result.source_tent_pre_bit_exact
+    )
+    return {
+        "implementation_protocol_valid": required_checks_valid and all(policy.values()),
+        "exact_reset": exact_reset,
+        "label_firewall": checks.get("safe_label_free_metadata") is True,
+        "finite_values": finite_logits and finite_diagnostics,
+        "exactly_one_optimizer_step_per_episode": diagnostics.get("optimizer_steps") == 1,
+        "source_pre_identity_contract": source_identity,
+        "tent_pre_identity_contract": tent_pre_identity,
+    }
 
 
 def _emit_cell_progress(
@@ -1515,9 +1781,9 @@ def execute_candidate(
                         f"candidate:{candidate_slug(candidate)}:{dataset}:"
                         f"{bn_protocol}:{corruption}_S{severity}:condition_start"
                     ),
-                    # Target bytes are not opened here.  Their already-bound
-                    # identity is checked with every other seal entry; a byte
-                    # rehash and mmap happen only after all 64 method calls.
+                    # The target file was already read as opaque bytes for the
+                    # entry SHA seal.  No target tensor is deserialized or
+                    # indexed here; that happens only after all 64 calls.
                     active_paths=(active_image_path,),
                 )
                 method_inputs = SourceCalibrationMethodInputDataset(
@@ -1541,11 +1807,19 @@ def execute_candidate(
                 evaluation_protocol = IRSTDEvaluationProtocol(
                     fixed_probability_threshold=0.5,
                     froc_probability_thresholds=(0.5,),
+                    connectivity=2,
+                    max_centroid_distance=3.0,
+                    min_component_area=1,
                 )
                 pre_evaluator = UnifiedResearchEvaluator(evaluation_protocol)
                 post_evaluator = UnifiedResearchEvaluator(evaluation_protocol)
                 cell_start_episode = runner.completed_episodes
                 returned_predictions: list[tuple[Tensor, Tensor]] = []
+                cell_gate_evidence = {
+                    key: True
+                    for key in REQUIRED_HARD_GATES
+                    if key != "zero_test_opens"
+                }
                 for index in range(len(method_inputs)):
                     sanitized_sample = method_inputs[index]
                     _require_equal(
@@ -1566,11 +1840,15 @@ def execute_candidate(
                         metadata=metadata,
                     )
                     expect_full = index == IMAGES_PER_CELL - 1
-                    _audit_episode(
+                    episode_gate_evidence = _audit_episode(
                         result,
                         bn_protocol=bn_protocol,
                         expect_full_audit=expect_full,
                     )
+                    for key, passed in episode_gate_evidence.items():
+                        cell_gate_evidence[key] = (
+                            cell_gate_evidence.get(key, True) and passed is True
+                        )
                     returned_predictions.append(
                         (result.logits_tent_pre, result.logits_tent_post)
                     )
@@ -1584,6 +1862,26 @@ def execute_candidate(
                     method_inputs.targets_opened,
                     False,
                     "method consumer remained target-free",
+                )
+                cell_gate_evidence["label_firewall"] = (
+                    cell_gate_evidence["label_firewall"]
+                    and method_inputs.targets_opened is False
+                    and tuple(method_inputs.method_metadata["sample_fields"])
+                    == METHOD_FACING_SAMPLE_FIELDS
+                )
+                direct_access_counters = {
+                    "test_image_opens": int(
+                        context.manifest["fixed_test_boundary"]["test_images_opened"]
+                    ),
+                    "test_label_opens": int(
+                        context.manifest["fixed_test_boundary"]["test_masks_opened"]
+                    ),
+                    "method_label_accesses": int(
+                        bool(context.manifest["label_firewall"]["method_received_labels"])
+                    ),
+                }
+                cell_gate_evidence["zero_test_opens"] = all(
+                    value == 0 for value in direct_access_counters.values()
                 )
                 # Every method-facing episode in this cell has returned.  Only
                 # now may the outer evaluator hash/map/index its separate target
@@ -1610,8 +1908,11 @@ def execute_candidate(
                     pre_evaluator.update_logits(tent_pre, outer_target)
                     post_evaluator.update_logits(tent_post, outer_target)
                 protocol_audit = {
-                    "candidate_model_method_optimizer_rebuilt_before_run": True,
-                    "global_runtime_seal_valid": True,
+                    "candidate_model_method_optimizer_rebuilt_before_run": bool(
+                        build_receipts[-1].get("fresh_model_method_optimizer")
+                    ),
+                    "global_runtime_seal_valid": bool(monitor.audits)
+                    and all(value.get("verified") is True for value in monitor.audits),
                     "fixed_seed_contract_valid": all(seed_audit.values()),
                 }
                 records.append(
@@ -1625,6 +1926,7 @@ def execute_candidate(
                         severity=severity,
                         tent_pre=_endpoint_counts(pre_evaluator),
                         tent_post=_endpoint_counts(post_evaluator),
+                        hard_gates=cell_gate_evidence,
                         protocol_audit=protocol_audit,
                     )
                 )
@@ -1682,7 +1984,13 @@ def execute_candidate(
         "test_image_opens": 0,
         "test_label_opens": 0,
         "method_label_accesses": 0,
-        "target_access_order": "outer_evaluator_after_episode_return_only",
+        "target_access_order": (
+            "opaque_integrity_hash_at_entry_then_tensor_access_"
+            "after_all_cell_episodes_complete"
+        ),
+        "target_access_audit": _target_access_audit(
+            tensor_evaluation_completed=True
+        ),
     }
 
 
@@ -1720,14 +2028,42 @@ def _write_jsonl(path: Path, values: Iterable[Mapping[str, Any]]) -> int:
 def _artifact_files(root: Path, excluded: Sequence[str]) -> dict[str, dict[str, Any]]:
     excluded_set = set(excluded)
     result: dict[str, dict[str, Any]] = {}
-    for path in sorted(value for value in root.rglob("*") if value.is_file()):
+    directories: set[str] = set()
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            raise CalibrationExecutionError(f"artifact descendant cannot be symlink: {path}")
+        if path.is_dir():
+            directories.add(path.relative_to(root).as_posix())
+            continue
+        if not path.is_file():
+            raise CalibrationExecutionError(
+                f"artifact descendant must be a regular file/directory: {path}"
+            )
         relative = path.relative_to(root).as_posix()
         if relative in excluded_set:
             continue
-        if path.is_symlink():
-            raise CalibrationExecutionError(f"artifact file cannot be symlink: {path}")
         result[relative] = {"sha256": sha256_file(path), "bytes": path.stat().st_size}
+    expected_directories = {
+        parent.as_posix()
+        for relative in result
+        for parent in Path(relative).parents
+        if parent != Path(".")
+    }
+    _require_equal(
+        directories,
+        expected_directories,
+        "artifact exact directory tree (no empty/extra directories)",
+    )
     return result
+
+
+def _assert_no_symlink_ancestors(path: Path, *, label: str) -> None:
+    current = path.absolute()
+    for candidate in (current, *current.parents):
+        if candidate.is_symlink():
+            raise CalibrationExecutionError(
+                f"{label} path/ancestor cannot be a symlink: {candidate}"
+            )
 
 
 def _rename_directory_noreplace(source: Path, destination: Path) -> None:
@@ -1770,31 +2106,75 @@ def _rename_directory_noreplace(source: Path, destination: Path) -> None:
     raise OSError(error_number, os.strerror(error_number), str(destination))
 
 
+def _acquire_recoverable_flock(path: Path, *, owner: str) -> int:
+    """Acquire a crash-recoverable advisory lock, using O_EXCL when first made."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    base_flags = os.O_RDWR | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, base_flags | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        descriptor = os.open(path, base_flags)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        os.ftruncate(descriptor, 0)
+        os.write(
+            descriptor,
+            f"pid={os.getpid()} owner={owner}\n".encode("utf-8"),
+        )
+    except BaseException:
+        os.close(descriptor)
+        raise
+    return descriptor
+
+
+def _publication_control_key(final: Path) -> str:
+    return (
+        hashlib.sha256(os.fsencode(str(final.resolve()))).hexdigest()[:20]
+        + "-"
+        + final.name
+    )
+
+
 def _publish_directory(
     *,
     final: Path,
+    work_root: Path,
     primary_files: Mapping[str, Any],
     manifest_metadata: Mapping[str, Any],
     completion_metadata: Mapping[str, Any],
 ) -> dict[str, Any]:
     final.parent.mkdir(parents=True, exist_ok=True)
-    lock = final.with_name(f".{final.name}.publish.lock")
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    if not final.parent.is_dir() or final.parent.is_symlink():
+        raise CalibrationExecutionError(
+            f"publication destination parent must be a real directory: {final.parent}"
+        )
+    work_root.mkdir(parents=True, exist_ok=True)
+    if not work_root.is_dir() or work_root.is_symlink():
+        raise CalibrationExecutionError(
+            f"publication work root must be a real directory: {work_root}"
+        )
+    _require_equal(
+        int(work_root.stat().st_dev),
+        int(final.parent.stat().st_dev),
+        "publication work/destination filesystem device",
+    )
+    if work_root == final or work_root.is_relative_to(final):
+        raise CalibrationExecutionError(
+            "publication work root must remain outside the destination artifact"
+        )
+    control_key = _publication_control_key(final)
+    lock = work_root / f".{control_key}.publish.lock"
     try:
-        lock_fd = os.open(lock, flags, 0o600)
-    except FileExistsError as error:
+        lock_fd = _acquire_recoverable_flock(lock, owner=f"publish:{final}")
+    except BlockingIOError as error:
         raise FileExistsError(
             f"publish lock already exists for destination: {lock}"
         ) from error
-    staging = final.with_name(
-        f".{final.name}.build-{os.getpid()}-{time.time_ns()}-{uuid.uuid4().hex[:8]}"
+    staging = work_root / (
+        f".{control_key}.build-{os.getpid()}-{time.time_ns()}-{uuid.uuid4().hex[:8]}"
     )
     try:
-        os.write(
-            lock_fd,
-            f"pid={os.getpid()} destination={final}\n".encode("utf-8"),
-        )
         if final.exists():
             raise FileExistsError(
                 f"refusing overwrite of completed destination: {final}"
@@ -1824,17 +2204,14 @@ def _publish_directory(
         _write_json(staging / "COMPLETE.json", completion)
         _rename_directory_noreplace(staging, final)
     except BaseException:
-        if staging.is_dir() and staging.parent == final.parent:
+        if staging.is_dir() and staging.parent == work_root:
             shutil.rmtree(staging)
         raise
     finally:
+        # Keep the inode as a durable, crash-recoverable flock rendezvous.  An
+        # unlink-before-close sequence can split concurrent publishers across
+        # the old unlinked inode and a newly created inode.
         os.close(lock_fd)
-        try:
-            lock.unlink()
-        except FileNotFoundError as error:
-            raise CalibrationExecutionError(
-                f"publish lock disappeared before release: {lock}"
-            ) from error
     return {
         "destination": str(final),
         "manifest": manifest,
@@ -1877,6 +2254,14 @@ def _resolve_top3_receipt(
     return expected
 
 
+def _stage2_slot_process_id(receipt_sha256: str, slot_index: int) -> str:
+    if not re.fullmatch(r"[0-9a-f]{64}", receipt_sha256):
+        raise CalibrationExecutionError("stage2 receipt SHA256 must be lowercase hex")
+    if slot_index not in (1, 2):
+        raise CalibrationExecutionError("stage2 slot_index must be 1 or 2")
+    return _safe_slug(f"stage2-{receipt_sha256}-slot-{slot_index}")
+
+
 def _scope_provenance(contract: CalibrationContract) -> dict[str, Any]:
     limitation = dict(
         _mapping(
@@ -1897,13 +2282,96 @@ def _scope_provenance(contract: CalibrationContract) -> dict[str, Any]:
     return {
         "scope": dict(SCOPE),
         "inherited_source_limitation": limitation,
+        "target_access_contract": {
+            "target_integrity_bytes_hashed_before_adaptation": True,
+            "integrity_hashing_is_opaque_byte_access_not_tensor_access": True,
+            "target_tensor_deserialized_or_indexed_only_after_all_cell_episodes_complete": True,
+        },
     }
 
 
+def _target_access_audit(*, tensor_evaluation_completed: bool) -> dict[str, bool]:
+    """Disclose byte-level integrity access separately from tensor access."""
+
+    return {
+        "target_integrity_bytes_hashed_before_adaptation": True,
+        "target_integrity_hashing_did_not_deserialize_or_index_tensor": True,
+        "target_tensor_deserialized_or_indexed_before_all_cell_episodes_complete": False,
+        "target_tensor_deserialized_and_indexed_after_all_cell_episodes_complete": bool(
+            tensor_evaluation_completed
+        ),
+    }
+
+
+def _observed_worker_environment(device: torch.device) -> dict[str, Any]:
+    """Record the actual isolated worker environment after CUDA configuration."""
+
+    logical_index = (
+        torch.cuda.current_device() if device.index is None else int(device.index)
+    )
+    cudnn_version = torch.backends.cudnn.version()
+    return {
+        "python": {
+            "implementation": platform.python_implementation(),
+            "version": platform.python_version(),
+            "executable": str(Path(sys.executable).resolve()),
+        },
+        "torch": {
+            "version": str(torch.__version__),
+            "compiled_cuda": None
+            if torch.version.cuda is None
+            else str(torch.version.cuda),
+            "compiled_cudnn": None
+            if cudnn_version is None
+            else int(cudnn_version),
+        },
+        "environment": {
+            "CUDA_VISIBLE_DEVICES": os.environ.get("CUDA_VISIBLE_DEVICES"),
+            "CUDA_DEVICE_ORDER": os.environ.get("CUDA_DEVICE_ORDER"),
+            "CUBLAS_WORKSPACE_CONFIG": os.environ.get("CUBLAS_WORKSPACE_CONFIG"),
+            "PYTHONHASHSEED": os.environ.get("PYTHONHASHSEED"),
+        },
+        "device": {
+            "logical_index": logical_index,
+            "visible_device_count": int(torch.cuda.device_count()),
+            "name": str(torch.cuda.get_device_name(logical_index)),
+            "capability": list(torch.cuda.get_device_capability(logical_index)),
+        },
+    }
+
+
+def _emit_worker_start(
+    *, stage: int, process_id: str, gpu_lease: Mapping[str, Any]
+) -> None:
+    print(
+        json.dumps(
+            {
+                "event": "binary_tent_source_calibration_worker_start",
+                "stage": int(stage),
+                "process_id": process_id,
+                "pid": os.getpid(),
+                "physical_gpu_id": gpu_lease["physical_gpu_id"],
+                "lease_path": gpu_lease["lease_path"],
+                "unix_time_ns": time.time_ns(),
+            },
+            sort_keys=True,
+            separators=JSON_SEPARATORS,
+            allow_nan=False,
+        ),
+        file=sys.stderr,
+        flush=True,
+    )
+
+
 def run_stage1_worker(args: argparse.Namespace) -> dict[str, Any]:
+    inherited_gpu_lease = _verify_inherited_gpu_lease(required=True)
     contract = load_contract(args.execution_config)
+    gpu_lease = _validate_formal_gpu_lease(
+        contract, inherited_gpu_lease, device_text=args.device
+    )
     candidate = _candidate_from_args(args.optimizer, args.learning_rate)
     process_id = _safe_slug(args.process_id)
+    _emit_worker_start(stage=1, process_id=process_id, gpu_lease=gpu_lease)
     destination = _stage1_shard_path(contract, candidate)
     if destination.exists():
         raise FileExistsError(f"stage-1 candidate shard already exists: {destination}")
@@ -1911,6 +2379,7 @@ def run_stage1_worker(args: argparse.Namespace) -> dict[str, Any]:
     monitor = RuntimeSealMonitor(seal)
     monitor.assert_unchanged(stage="stage1_process_entry", full_byte_rehash=False)
     device = _configure_cuda_worker(contract, args.device)
+    worker_environment = _observed_worker_environment(device)
     records, summary = execute_candidate(
         contract=contract,
         caches=caches,
@@ -1919,6 +2388,14 @@ def run_stage1_worker(args: argparse.Namespace) -> dict[str, Any]:
         process_id=process_id,
         candidate=candidate,
         device=device,
+    )
+    summary["worker_environment"] = worker_environment
+    summary["physical_gpu_lease"] = gpu_lease
+    summary["stage"] = 1
+    summary["process_id"] = process_id
+    summary["fresh_process"] = True
+    summary["target_access_audit"] = _target_access_audit(
+        tensor_evaluation_completed=True
     )
     monitor.assert_unchanged(stage="stage1_pre_publish", full_byte_rehash=True)
     provenance = {
@@ -1935,11 +2412,17 @@ def run_stage1_worker(args: argparse.Namespace) -> dict[str, Any]:
         "test_image_opens": 0,
         "test_label_opens": 0,
         "method_label_accesses": 0,
+        "worker_environment": worker_environment,
+        "physical_gpu_lease": gpu_lease,
+        "target_access_audit": _target_access_audit(
+            tensor_evaluation_completed=True
+        ),
         "paper_result": False,
         **_scope_provenance(contract),
     }
     return _publish_directory(
         final=destination,
+        work_root=contract.publication_work_root,
         primary_files={
             "records.jsonl": records,
             "run_summary.json": summary,
@@ -1949,6 +2432,9 @@ def run_stage1_worker(args: argparse.Namespace) -> dict[str, Any]:
         manifest_metadata={
             "artifact_type": "binary_tent_source_calibration_stage1_candidate_shard",
             "stage": 1,
+            "fresh_process": True,
+            "physical_gpu_lease": gpu_lease,
+            "worker_environment": worker_environment,
             "process_id": process_id,
             "candidate": candidate.to_dict(),
             "record_count": 78,
@@ -1982,8 +2468,13 @@ def _load_top3(path: Path) -> tuple[Candidate, ...]:
 
 
 def run_stage2_worker(args: argparse.Namespace) -> dict[str, Any]:
+    inherited_gpu_lease = _verify_inherited_gpu_lease(required=True)
     contract = load_contract(args.execution_config)
+    gpu_lease = _validate_formal_gpu_lease(
+        contract, inherited_gpu_lease, device_text=args.device
+    )
     process_id = _safe_slug(args.process_id)
+    _emit_worker_start(stage=2, process_id=process_id, gpu_lease=gpu_lease)
     destination = _stage2_shard_path(contract, process_id)
     if destination.exists():
         raise FileExistsError(f"stage-2 process shard already exists: {destination}")
@@ -1991,17 +2482,25 @@ def run_stage2_worker(args: argparse.Namespace) -> dict[str, Any]:
         contract, getattr(args, "top3_receipt", None)
     )
     base_seal, caches = capture_runtime_seal(contract)
-    _verify_stage1_aggregate(contract, base_seal)
-    receipt_binding = _bound_file(
-        receipt_path, role="stage1_top3_receipt"
+    stage1_verified = _verify_stage1_aggregate(contract, base_seal)
+    seal, receipt_binding, _stage1_reverified = (
+        _bind_verified_stage1_receipt(
+            contract, base_seal, stage1_verified=stage1_verified
+        )
     )
-    seal = _extend_runtime_seal(base_seal, receipt_binding)
+    slot_index = int(args.slot_index)
+    _require_equal(
+        process_id,
+        _stage2_slot_process_id(receipt_binding.sha256, slot_index),
+        "stage2 deterministic receipt-bound process ID",
+    )
     monitor = RuntimeSealMonitor(seal)
     monitor.assert_unchanged(
         stage="stage2_process_entry", active_paths=(receipt_path,)
     )
     top3 = _load_top3(receipt_path)
     device = _configure_cuda_worker(contract, args.device)
+    worker_environment = _observed_worker_environment(device)
     all_records: list[dict[str, Any]] = []
     candidate_summaries: list[dict[str, Any]] = []
     build_guard: set[tuple[int, int, int]] = set()
@@ -2028,6 +2527,7 @@ def run_stage2_worker(args: argparse.Namespace) -> dict[str, Any]:
     summary = {
         "stage": 2,
         "process_id": process_id,
+        "slot_index": slot_index,
         "fresh_process": True,
         "top3_in_frozen_order": [value.to_dict() for value in top3],
         "candidate_summaries": candidate_summaries,
@@ -2037,12 +2537,18 @@ def run_stage2_worker(args: argparse.Namespace) -> dict[str, Any]:
         "test_image_opens": 0,
         "test_label_opens": 0,
         "method_label_accesses": 0,
+        "worker_environment": worker_environment,
+        "physical_gpu_lease": gpu_lease,
+        "target_access_audit": _target_access_audit(
+            tensor_evaluation_completed=True
+        ),
     }
     provenance = {
         "schema_version": 1,
         "stage": 2,
         "fresh_process": True,
         "process_id": process_id,
+        "slot_index": slot_index,
         "pid": os.getpid(),
         "top3_receipt": str(receipt_path),
         "top3_receipt_sha256": receipt_binding.sha256,
@@ -2052,11 +2558,17 @@ def run_stage2_worker(args: argparse.Namespace) -> dict[str, Any]:
         "test_image_opens": 0,
         "test_label_opens": 0,
         "method_label_accesses": 0,
+        "worker_environment": worker_environment,
+        "physical_gpu_lease": gpu_lease,
+        "target_access_audit": _target_access_audit(
+            tensor_evaluation_completed=True
+        ),
         "paper_result": False,
         **_scope_provenance(contract),
     }
     return _publish_directory(
         final=destination,
+        work_root=contract.publication_work_root,
         primary_files={
             "records.jsonl": all_records,
             "run_summary.json": summary,
@@ -2066,7 +2578,11 @@ def run_stage2_worker(args: argparse.Namespace) -> dict[str, Any]:
         manifest_metadata={
             "artifact_type": "binary_tent_source_calibration_stage2_process_shard",
             "stage": 2,
+            "fresh_process": True,
+            "physical_gpu_lease": gpu_lease,
+            "worker_environment": worker_environment,
             "process_id": process_id,
+            "slot_index": slot_index,
             "top3_in_frozen_order": [value.to_dict() for value in top3],
             "record_count": 234,
             "episode_count": 14976,
@@ -2078,6 +2594,7 @@ def run_stage2_worker(args: argparse.Namespace) -> dict[str, Any]:
         completion_metadata={
             "stage": 2,
             "process_id": process_id,
+            "slot_index": slot_index,
             "record_count": 234,
             "episode_count": 14976,
             "global_runtime_seal_sha256": seal.global_runtime_seal_sha256,
@@ -2099,6 +2616,11 @@ def _load_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def verify_shard(path: Path, *, expected_seal_sha256: str) -> dict[str, Any]:
+    _assert_no_symlink_ancestors(path, label="artifact")
+    if not path.is_dir() or path.is_symlink():
+        raise CalibrationExecutionError(
+            f"artifact root must be a real directory, not a symlink: {path}"
+        )
     manifest_path = path / "artifact_manifest.json"
     complete_path = path / "COMPLETE.json"
     manifest = _load_json(manifest_path)
@@ -2129,20 +2651,135 @@ def verify_shard(path: Path, *, expected_seal_sha256: str) -> dict[str, Any]:
     }
 
 
-def _verify_embedded_scope(value: Mapping[str, Any], *, label: str) -> None:
-    _require_equal(
-        dict(_mapping(value.get("scope"), f"{label}.scope")),
-        SCOPE,
-        f"{label} scope",
+def _verify_embedded_scope(
+    contract: CalibrationContract, value: Mapping[str, Any], *, label: str
+) -> None:
+    expected = _scope_provenance(contract)
+    for key in ("scope", "inherited_source_limitation", "target_access_contract"):
+        _require_equal(
+            dict(_mapping(value.get(key), f"{label}.{key}")),
+            expected[key],
+            f"{label} {key}",
+        )
+
+
+def _verify_embedded_gpu_lease(
+    *,
+    contract: CalibrationContract,
+    manifest: Mapping[str, Any],
+    provenance: Mapping[str, Any],
+    summary: Mapping[str, Any],
+    label: str,
+) -> None:
+    receipts = tuple(
+        dict(
+            _mapping(
+                value.get("physical_gpu_lease"),
+                f"{label} {source} physical GPU lease",
+            )
+        )
+        for source, value in (
+            ("manifest", manifest),
+            ("provenance", provenance),
+            ("summary", summary),
+        )
     )
-    limitation = _mapping(
-        value.get("inherited_source_limitation"),
-        f"{label}.inherited_source_limitation",
+    _require_equal(receipts[1], receipts[0], f"{label} provenance GPU lease")
+    _require_equal(receipts[2], receipts[0], f"{label} summary GPU lease")
+    receipt = receipts[0]
+    for key, expected in (
+        ("launcher_managed", True),
+        ("linux_parent_death_signal", "SIGTERM"),
+        ("worker_parent_pid_guard_verified", True),
+        ("worker_holds_lease_for_process_lifetime", True),
+        ("stage_launcher_claim_fd_inherited_for_process_lifetime", True),
+    ):
+        _require_equal(receipt.get(key), expected, f"{label} GPU lease {key}")
+    gpu_id = _canonical_physical_gpu_id(
+        receipt.get("physical_gpu_id"), label=f"{label} physical GPU ID"
+    )
+    lease_path = Path(str(receipt.get("lease_path", "")))
+    configured_lease_directory = Path(
+        str(contract.execution["launcher"]["physical_gpu_lease_directory"])
+    ).expanduser()
+    if not configured_lease_directory.is_absolute():
+        configured_lease_directory = PROJECT_ROOT / configured_lease_directory
+    configured_lease_path = (
+        configured_lease_directory.absolute() / f"physical-gpu-{gpu_id}.lock"
+    )
+    _assert_no_symlink_ancestors(
+        configured_lease_path, label=f"{label} configured GPU lease"
+    )
+    expected_lease_path = _project_path(configured_lease_path)
+    _require_equal(
+        lease_path,
+        expected_lease_path,
+        f"{label} GPU lease path",
+    )
+    _assert_no_symlink_ancestors(lease_path, label=f"{label} GPU lease")
+    if not lease_path.is_file() or lease_path.is_symlink():
+        raise CalibrationExecutionError(
+            f"{label} configured GPU lease is missing/non-regular/symlink: "
+            f"{lease_path}"
+        )
+    lease_stat = lease_path.stat()
+    if not stat_module.S_ISREG(lease_stat.st_mode):
+        raise CalibrationExecutionError(
+            f"{label} configured GPU lease is not a regular file: {lease_path}"
+        )
+    for key in ("lease_device", "lease_inode", "launcher_pid"):
+        value = receipt.get(key)
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            raise CalibrationExecutionError(
+                f"{label} GPU lease {key} must be a positive integer"
+            )
+    _require_equal(
+        (int(receipt["lease_device"]), int(receipt["lease_inode"])),
+        (int(lease_stat.st_dev), int(lease_stat.st_ino)),
+        f"{label} durable GPU lease inode",
+    )
+    worker_environments = tuple(
+        dict(
+            _mapping(
+                value.get("worker_environment"),
+                f"{label} {source} worker environment",
+            )
+        )
+        for source, value in (
+            ("manifest", manifest),
+            ("provenance", provenance),
+            ("summary", summary),
+        )
     )
     _require_equal(
-        limitation.get("checkpoint_selection"),
-        "test_selected_during_source_training",
-        f"{label} inherited checkpoint selection",
+        worker_environments[1],
+        worker_environments[0],
+        f"{label} provenance worker environment",
+    )
+    _require_equal(
+        worker_environments[2],
+        worker_environments[0],
+        f"{label} summary worker environment",
+    )
+    worker_environment = worker_environments[0]
+    environment = _mapping(
+        worker_environment.get("environment"), f"{label} process environment"
+    )
+    _require_equal(
+        environment.get("CUDA_VISIBLE_DEVICES"),
+        gpu_id,
+        f"{label} GPU lease/environment ID",
+    )
+    for key, expected in (
+        ("CUDA_DEVICE_ORDER", "PCI_BUS_ID"),
+        ("CUBLAS_WORKSPACE_CONFIG", ":4096:8"),
+        ("PYTHONHASHSEED", "42"),
+    ):
+        _require_equal(environment.get(key), expected, f"{label} environment {key}")
+    device = _mapping(worker_environment.get("device"), f"{label} CUDA device")
+    _require_equal(device.get("logical_index"), 0, f"{label} logical CUDA index")
+    _require_equal(
+        device.get("visible_device_count"), 1, f"{label} visible CUDA device count"
     )
 
 
@@ -2164,11 +2801,15 @@ def _verify_stage1_candidate_shard(
     )
     for value, expected, label in (
         (manifest.get("stage"), 1, "manifest stage"),
+        (manifest.get("fresh_process"), True, "manifest fresh process"),
         (complete.get("stage"), 1, "completion stage"),
         (manifest.get("candidate"), candidate.to_dict(), "manifest candidate"),
         (complete.get("candidate"), candidate.to_dict(), "completion candidate"),
         (manifest.get("record_count"), 78, "record count"),
         (manifest.get("episode_count"), 4992, "episode count"),
+        (complete.get("record_count"), 78, "completion record count"),
+        (complete.get("episode_count"), 4992, "completion episode count"),
+        (complete.get("scope"), dict(SCOPE), "completion scope"),
     ):
         _require_equal(value, expected, f"stage1 {label}")
     _require_equal(
@@ -2183,6 +2824,9 @@ def _verify_stage1_candidate_shard(
     observed_cells: set[tuple[str, str, str, int]] = set()
     for record in verified["records"]:
         _require_equal(record.get("stage"), 1, "stage1 record stage")
+        _require_equal(
+            record.get("fresh_process"), True, "stage1 record fresh process"
+        )
         _require_equal(
             record.get("candidate"), candidate.to_dict(), "stage1 record candidate"
         )
@@ -2202,11 +2846,27 @@ def _verify_stage1_candidate_shard(
             set(REQUIRED_HARD_GATES),
             "stage1 hard-gate set",
         )
+        if not all(
+            value is True
+            for value in _mapping(
+                record.get("hard_gates"), "stage1 hard gates"
+            ).values()
+        ):
+            raise CalibrationExecutionError("stage1 record contains a failed hard gate")
         _require_equal(
             set(_mapping(record.get("protocol_audit"), "stage1 protocol audit")),
             set(REQUIRED_PROTOCOL_AUDIT),
             "stage1 protocol-audit set",
         )
+        if not all(
+            value is True
+            for value in _mapping(
+                record.get("protocol_audit"), "stage1 protocol audit"
+            ).values()
+        ):
+            raise CalibrationExecutionError(
+                "stage1 record contains a failed protocol audit"
+            )
         cell = (
             str(record["dataset"]),
             str(record["bn_protocol"]),
@@ -2229,7 +2889,48 @@ def _verify_stage1_candidate_shard(
         "stage1 embedded runtime seal",
     )
     provenance = _load_json(path / "provenance.json")
-    _verify_embedded_scope(provenance, label="stage1 provenance")
+    summary = _load_json(path / "run_summary.json")
+    _verify_embedded_scope(contract, provenance, label="stage1 provenance")
+    _verify_embedded_scope(contract, manifest, label="stage1 manifest")
+    for value, expected, label in (
+        (provenance.get("fresh_process"), True, "provenance fresh process"),
+        (provenance.get("process_id"), process_id, "provenance process ID"),
+        (provenance.get("stage"), 1, "provenance stage"),
+        (
+            provenance.get("candidate"),
+            candidate.to_dict(),
+            "provenance candidate",
+        ),
+        (summary.get("fresh_process"), True, "summary fresh process"),
+        (summary.get("process_id"), process_id, "summary process ID"),
+        (summary.get("stage"), 1, "summary stage"),
+        (summary.get("candidate"), candidate.to_dict(), "summary candidate"),
+        (summary.get("cell_record_count"), 78, "summary record count"),
+        (summary.get("episode_count"), 4992, "summary episode count"),
+        (
+            summary.get("model_method_optimizer_build_count"),
+            len(DATASETS) * len(BN_PROTOCOLS),
+            "summary rebuild count",
+        ),
+        (
+            summary.get("target_access_audit"),
+            _target_access_audit(tensor_evaluation_completed=True),
+            "summary target access audit",
+        ),
+        (
+            provenance.get("target_access_audit"),
+            _target_access_audit(tensor_evaluation_completed=True),
+            "provenance target access audit",
+        ),
+    ):
+        _require_equal(value, expected, f"stage1 {label}")
+    _verify_embedded_gpu_lease(
+        contract=contract,
+        manifest=manifest,
+        provenance=provenance,
+        summary=summary,
+        label="stage1",
+    )
     _require_equal(
         provenance.get("global_runtime_seal_sha256"),
         seal.global_runtime_seal_sha256,
@@ -2258,6 +2959,9 @@ def _verify_stage1_aggregate(
         (manifest.get("candidate_count"), 10, "candidate count"),
         (manifest.get("fresh_process_count"), 10, "fresh process count"),
         (complete.get("stage"), 1, "completion stage"),
+        (complete.get("record_count"), 780, "completion record count"),
+        (complete.get("episode_count"), 49920, "completion episode count"),
+        (complete.get("scope"), dict(SCOPE), "completion scope"),
     ):
         _require_equal(value, expected, f"stage1 aggregate {label}")
     _require_equal(
@@ -2271,7 +2975,11 @@ def _verify_stage1_aggregate(
         },
         "stage1 aggregate exact primary files",
     )
-    expected_receipt = select_stage1_top3(verified["records"])
+    endpoint_invariants = _verify_cross_run_endpoint_invariants(verified["records"])
+    expected_receipt = {
+        **select_stage1_top3(verified["records"]),
+        "endpoint_invariants": endpoint_invariants,
+    }
     observed_receipt = _load_json(_stage1_receipt_path(contract))
     _require_equal(observed_receipt, expected_receipt, "stage1 aggregate receipt")
     _require_equal(
@@ -2283,29 +2991,166 @@ def _verify_stage1_aggregate(
         "stage1 aggregate embedded runtime seal",
     )
     provenance = _load_json(path / "provenance.json")
-    _verify_embedded_scope(provenance, label="stage1 aggregate provenance")
-    _verify_embedded_scope(manifest, label="stage1 aggregate manifest")
+    _require_equal(
+        provenance.get("endpoint_invariants"),
+        endpoint_invariants,
+        "stage1 aggregate provenance endpoint invariants",
+    )
+    _require_equal(
+        manifest.get("endpoint_invariants"),
+        endpoint_invariants,
+        "stage1 aggregate manifest endpoint invariants",
+    )
+    _verify_embedded_scope(
+        contract, provenance, label="stage1 aggregate provenance"
+    )
+    _verify_embedded_scope(contract, manifest, label="stage1 aggregate manifest")
+    shard_index = _load_json(path / "shard_index.json")
+    _require_equal(
+        set(shard_index), {"shards"}, "stage1 aggregate shard-index fields"
+    )
+    indexed_shards = _sequence(
+        shard_index.get("shards"), "stage1 aggregate shard index"
+    )
+    _require_equal(len(indexed_shards), len(ALL_CANDIDATES), "stage1 shard index count")
+    source_records: list[dict[str, Any]] = []
+    for candidate, raw_index in zip(ALL_CANDIDATES, indexed_shards, strict=True):
+        index_record = _mapping(raw_index, "stage1 shard index record")
+        source_shard = _verify_stage1_candidate_shard(contract, seal, candidate)
+        expected_index = {
+            "candidate": candidate.to_dict(),
+            "process_id": source_shard["manifest"]["process_id"],
+            "artifact_manifest_sha256": source_shard["manifest_sha256"],
+        }
+        _require_equal(
+            dict(index_record), expected_index, "stage1 aggregate/source shard lineage"
+        )
+        source_records.extend(source_shard["records"])
+    _require_equal(
+        verified["records"],
+        source_records,
+        "stage1 aggregate/source shard records",
+    )
     return verified
+
+
+def _bind_verified_stage1_receipt(
+    contract: CalibrationContract,
+    base_seal: RuntimeSeal,
+    *,
+    stage1_verified: Mapping[str, Any],
+) -> tuple[RuntimeSeal, BoundFile, dict[str, Any]]:
+    """Bind the verified receipt and reverify its aggregate to close TOCTOU."""
+
+    receipt_path = _stage1_receipt_path(contract)
+    manifest = _mapping(
+        stage1_verified.get("manifest"), "verified stage1 aggregate manifest"
+    )
+    receipt_record = _mapping(
+        _mapping(manifest.get("files"), "stage1 aggregate files").get(
+            "stage1_top3_receipt.json"
+        ),
+        "stage1 aggregate receipt file record",
+    )
+    receipt_binding = _bound_file(
+        receipt_path,
+        role="stage1_top3_receipt",
+        expected_sha256=str(receipt_record["sha256"]),
+    )
+    _require_equal(
+        receipt_binding.bytes,
+        int(receipt_record["bytes"]),
+        "stage1 aggregate receipt byte count",
+    )
+    seal = _extend_runtime_seal(base_seal, receipt_binding)
+    reverified = _verify_stage1_aggregate(contract, base_seal)
+    _require_equal(
+        reverified["manifest_sha256"],
+        stage1_verified["manifest_sha256"],
+        "stage1 aggregate verify/bind/reverify identity",
+    )
+    rebound = _bound_file(
+        receipt_path,
+        role="stage1_top3_receipt",
+        expected_sha256=receipt_binding.sha256,
+    )
+    _require_equal(rebound, receipt_binding, "stage1 receipt process-entry identity")
+    return seal, receipt_binding, reverified
 
 
 def _verify_stage2_process_shard(
     path: Path,
     *,
+    contract: CalibrationContract,
     seal: RuntimeSeal,
     top3: Sequence[Candidate],
+    expected_slot_index: int | None = None,
 ) -> dict[str, Any]:
     verified = verify_shard(
         path, expected_seal_sha256=seal.global_runtime_seal_sha256
     )
     manifest = verified["manifest"]
+    complete = verified["complete"]
+    receipt_bindings = [
+        value for value in seal.bindings if value.role == "stage1_top3_receipt"
+    ]
+    _require_equal(len(receipt_bindings), 1, "stage2 receipt seal binding count")
+    receipt_binding = receipt_bindings[0]
+    base_seal = _runtime_seal_from_bindings(
+        tuple(value for value in seal.bindings if value is not receipt_binding),
+        seal.cache_lineage,
+        seal.runtime_environment,
+    )
     _require_equal(
         manifest.get("artifact_type"),
         "binary_tent_source_calibration_stage2_process_shard",
         "stage2 process artifact type",
     )
     _require_equal(manifest.get("stage"), 2, "stage2 manifest stage")
+    _require_equal(
+        manifest.get("fresh_process"), True, "stage2 manifest fresh process"
+    )
+    if expected_slot_index is not None:
+        expected_process_id = _stage2_slot_process_id(
+            receipt_binding.sha256, expected_slot_index
+        )
+        _require_equal(
+            manifest.get("slot_index"),
+            expected_slot_index,
+            "stage2 manifest slot index",
+        )
+        _require_equal(
+            manifest.get("process_id"),
+            expected_process_id,
+            "stage2 deterministic process ID",
+        )
+        _require_equal(path.name, expected_process_id, "stage2 deterministic shard path")
     _require_equal(manifest.get("record_count"), 234, "stage2 record count")
     _require_equal(manifest.get("episode_count"), 14976, "stage2 episode count")
+    for value, expected, label in (
+        (
+            manifest.get("stage1_runtime_seal_sha256"),
+            base_seal.global_runtime_seal_sha256,
+            "manifest stage1 runtime seal",
+        ),
+        (
+            manifest.get("top3_receipt_sha256"),
+            receipt_binding.sha256,
+            "manifest receipt SHA256",
+        ),
+        (complete.get("stage"), 2, "completion stage"),
+        (complete.get("process_id"), manifest.get("process_id"), "completion process ID"),
+        (complete.get("slot_index"), manifest.get("slot_index"), "completion slot"),
+        (complete.get("record_count"), 234, "completion record count"),
+        (complete.get("episode_count"), 14976, "completion episode count"),
+        (
+            complete.get("top3_receipt_sha256"),
+            receipt_binding.sha256,
+            "completion receipt SHA256",
+        ),
+        (complete.get("scope"), dict(SCOPE), "completion scope"),
+    ):
+        _require_equal(value, expected, f"stage2 {label}")
     _require_equal(
         set(_mapping(manifest.get("files"), "stage2 process files")),
         {"records.jsonl", "run_summary.json", "provenance.json", "runtime_seal.json"},
@@ -2322,18 +3167,240 @@ def _verify_stage2_process_shard(
         "stage2 embedded runtime seal",
     )
     provenance = _load_json(path / "provenance.json")
-    _verify_embedded_scope(provenance, label="stage2 provenance")
-    _verify_embedded_scope(manifest, label="stage2 manifest")
-    receipt_bindings = [
-        value for value in seal.bindings if value.role.startswith("stage1_top3_receipt")
-    ]
-    _require_equal(len(receipt_bindings), 1, "stage2 receipt seal binding count")
+    summary = _load_json(path / "run_summary.json")
+    _verify_embedded_scope(contract, provenance, label="stage2 provenance")
+    _verify_embedded_scope(contract, manifest, label="stage2 manifest")
     _require_equal(
         provenance.get("top3_receipt_sha256"),
-        receipt_bindings[0].sha256,
+        receipt_binding.sha256,
         "stage2 provenance receipt SHA256",
     )
+    process_id = _safe_slug(str(manifest["process_id"]))
+    for value, expected, label in (
+        (provenance.get("fresh_process"), True, "provenance fresh process"),
+        (provenance.get("process_id"), process_id, "provenance process ID"),
+        (provenance.get("stage"), 2, "provenance stage"),
+        (
+            provenance.get("top3_receipt"),
+            str(_stage1_receipt_path(contract)),
+            "provenance canonical receipt path",
+        ),
+        (
+            provenance.get("slot_index"),
+            manifest.get("slot_index"),
+            "provenance slot",
+        ),
+        (summary.get("fresh_process"), True, "summary fresh process"),
+        (summary.get("process_id"), process_id, "summary process ID"),
+        (summary.get("stage"), 2, "summary stage"),
+        (summary.get("slot_index"), manifest.get("slot_index"), "summary slot"),
+        (summary.get("record_count"), 234, "summary record count"),
+        (summary.get("episode_count"), 14976, "summary episode count"),
+        (
+            summary.get("top3_in_frozen_order"),
+            [value.to_dict() for value in top3],
+            "summary top3 order",
+        ),
+        (
+            summary.get("candidate_model_method_optimizer_rebuilt_before_each_candidate"),
+            True,
+            "summary candidate rebuild policy",
+        ),
+        (
+            summary.get("target_access_audit"),
+            _target_access_audit(tensor_evaluation_completed=True),
+            "summary target access audit",
+        ),
+        (
+            provenance.get("target_access_audit"),
+            _target_access_audit(tensor_evaluation_completed=True),
+            "provenance target access audit",
+        ),
+    ):
+        _require_equal(value, expected, f"stage2 {label}")
+    _verify_embedded_gpu_lease(
+        contract=contract,
+        manifest=manifest,
+        provenance=provenance,
+        summary=summary,
+        label="stage2",
+    )
+    expected_cells = {
+        (dataset, protocol, corruption, severity)
+        for dataset in DATASETS
+        for protocol in BN_PROTOCOLS
+        for corruption, severity in CONDITIONS
+    }
+    cells_by_candidate: dict[Candidate, set[tuple[str, str, str, int]]] = {
+        candidate: set() for candidate in top3
+    }
+    observed_candidate_order: list[Candidate] = []
+    for record in verified["records"]:
+        for value, expected, label in (
+            (record.get("stage"), 2, "record stage"),
+            (record.get("fresh_process"), True, "record fresh process"),
+            (record.get("process_id"), process_id, "record process ID"),
+            (record.get("image_count"), IMAGES_PER_CELL, "record image count"),
+            (
+                record.get("optimizer_steps_total"),
+                IMAGES_PER_CELL,
+                "record optimizer steps",
+            ),
+        ):
+            _require_equal(value, expected, f"stage2 {label}")
+        hard_gates = _mapping(record.get("hard_gates"), "stage2 hard gates")
+        protocol_audit = _mapping(
+            record.get("protocol_audit"), "stage2 protocol audit"
+        )
+        _require_equal(
+            set(hard_gates), set(REQUIRED_HARD_GATES), "stage2 hard-gate set"
+        )
+        _require_equal(
+            set(protocol_audit),
+            set(REQUIRED_PROTOCOL_AUDIT),
+            "stage2 protocol-audit set",
+        )
+        if not all(value is True for value in hard_gates.values()):
+            raise CalibrationExecutionError("stage2 record contains a failed hard gate")
+        if not all(value is True for value in protocol_audit.values()):
+            raise CalibrationExecutionError(
+                "stage2 record contains a failed protocol audit"
+            )
+        candidate = Candidate.from_values(
+            record["candidate"]["optimizer"], record["candidate"]["learning_rate"]
+        )
+        if candidate not in cells_by_candidate:
+            raise CalibrationExecutionError(
+                f"stage2 record contains candidate outside frozen top3: {candidate}"
+            )
+        if not observed_candidate_order or observed_candidate_order[-1] != candidate:
+            observed_candidate_order.append(candidate)
+        cell = (
+            str(record["dataset"]),
+            str(record["bn_protocol"]),
+            str(record["corruption"]),
+            int(record["severity"]),
+        )
+        if cell in cells_by_candidate[candidate]:
+            raise CalibrationExecutionError(
+                f"duplicate stage2 candidate cell for {candidate}: {cell}"
+            )
+        cells_by_candidate[candidate].add(cell)
+    _require_equal(
+        tuple(observed_candidate_order), tuple(top3), "stage2 record candidate order"
+    )
+    for candidate in top3:
+        _require_equal(
+            cells_by_candidate[candidate],
+            expected_cells,
+            f"stage2 complete cells for {candidate}",
+        )
     return verified
+
+
+def _endpoint_integer_counts(
+    record: Mapping[str, Any], endpoint: str, *, label: str
+) -> tuple[int, int, int, int, int, int]:
+    values = _mapping(
+        _mapping(record.get("endpoints"), f"{label}.endpoints").get(endpoint),
+        f"{label}.endpoints.{endpoint}",
+    )
+    keys = (
+        "intersection_pixels",
+        "union_pixels",
+        "false_alarm_pixels",
+        "total_image_pixels",
+        "detected_targets",
+        "total_targets",
+    )
+    result: list[int] = []
+    for key in keys:
+        value = values.get(key)
+        if isinstance(value, bool) or not isinstance(value, int):
+            raise CalibrationExecutionError(f"{label}.{endpoint}.{key} must be integer")
+        result.append(value)
+    return tuple(result)  # type: ignore[return-value]
+
+
+def _verify_cross_run_endpoint_invariants(
+    stage1_records: Sequence[Mapping[str, Any]],
+    stage2_records: Sequence[Mapping[str, Any]] = (),
+) -> dict[str, Any]:
+    """Prove protocol-matched pre identity and denominator conservation."""
+
+    expected_total_pixels = IMAGES_PER_CELL * 256 * 256
+    stage1_pre_by_cell: dict[tuple[str, str, str, int], tuple[int, ...]] = {}
+    total_targets_by_dataset: dict[str, int] = {}
+
+    def check_record(
+        record: Mapping[str, Any], *, source: str, index: int
+    ) -> None:
+        label = f"{source}[{index}]"
+        pre = _endpoint_integer_counts(record, "tent_pre", label=label)
+        post = _endpoint_integer_counts(record, "tent_post", label=label)
+        _require_equal(
+            pre[3], expected_total_pixels, f"{label} TENT-pre total_image_pixels"
+        )
+        _require_equal(
+            post[3], expected_total_pixels, f"{label} TENT-post total_image_pixels"
+        )
+        _require_equal(pre[5], post[5], f"{label} pre/post total_targets")
+        dataset = str(record["dataset"])
+        if dataset in total_targets_by_dataset:
+            _require_equal(
+                pre[5],
+                total_targets_by_dataset[dataset],
+                f"{dataset} conserved total_targets",
+            )
+        else:
+            total_targets_by_dataset[dataset] = pre[5]
+        cell = (
+            dataset,
+            str(record["bn_protocol"]),
+            str(record["corruption"]),
+            int(record["severity"]),
+        )
+        if source == "stage1":
+            if cell in stage1_pre_by_cell:
+                _require_equal(
+                    pre,
+                    stage1_pre_by_cell[cell],
+                    f"stage1 protocol-matched TENT-pre identity for {cell}",
+                )
+            else:
+                stage1_pre_by_cell[cell] = pre
+        else:
+            if cell not in stage1_pre_by_cell:
+                raise CalibrationExecutionError(
+                    f"stage2 cell has no stage1 TENT-pre anchor: {cell}"
+                )
+            _require_equal(
+                pre,
+                stage1_pre_by_cell[cell],
+                f"stage2/stage1 protocol-matched TENT-pre identity for {cell}",
+            )
+
+    for index, record in enumerate(stage1_records):
+        check_record(record, source="stage1", index=index)
+    _require_equal(
+        set(stage1_pre_by_cell),
+        {
+            (dataset, protocol, corruption, severity)
+            for dataset in DATASETS
+            for protocol in BN_PROTOCOLS
+            for corruption, severity in CONDITIONS
+        },
+        "stage1 TENT-pre anchor cell set",
+    )
+    for index, record in enumerate(stage2_records):
+        check_record(record, source="stage2", index=index)
+    return {
+        "tent_pre_integer_counts_identical_across_stage1_candidates": True,
+        "stage2_tent_pre_integer_counts_equal_stage1": bool(stage2_records),
+        "total_image_pixels_per_cell": expected_total_pixels,
+        "total_targets_conserved_within_each_dataset": True,
+        "dataset_total_targets": dict(sorted(total_targets_by_dataset.items())),
+    }
 
 
 def aggregate_stage1(args: argparse.Namespace) -> dict[str, Any]:
@@ -2359,7 +3426,11 @@ def aggregate_stage1(args: argparse.Namespace) -> dict[str, Any]:
                 "artifact_manifest_sha256": verified["manifest_sha256"],
             }
         )
-    receipt = select_stage1_top3(records)
+    endpoint_invariants = _verify_cross_run_endpoint_invariants(records)
+    receipt = {
+        **select_stage1_top3(records),
+        "endpoint_invariants": endpoint_invariants,
+    }
     monitor.assert_unchanged(stage="stage1_aggregate_pre_publish", full_byte_rehash=True)
     destination = _stage1_aggregate_path(contract)
     provenance = {
@@ -2367,10 +3438,12 @@ def aggregate_stage1(args: argparse.Namespace) -> dict[str, Any]:
         "artifact_type": "binary_tent_source_calibration_stage1_aggregate",
         "global_runtime_seal_sha256": seal.global_runtime_seal_sha256,
         "runtime_audits": monitor.audits,
+        "endpoint_invariants": endpoint_invariants,
         **_scope_provenance(contract),
     }
     return _publish_directory(
         final=destination,
+        work_root=contract.publication_work_root,
         primary_files={
             "stage1_top3_receipt.json": receipt,
             "stage1_records.jsonl": records,
@@ -2384,6 +3457,7 @@ def aggregate_stage1(args: argparse.Namespace) -> dict[str, Any]:
             "episode_count": 49920,
             "candidate_count": 10,
             "fresh_process_count": 10,
+            "endpoint_invariants": endpoint_invariants,
             "global_runtime_seal_sha256": seal.global_runtime_seal_sha256,
             **_scope_provenance(contract),
         },
@@ -2398,15 +3472,218 @@ def aggregate_stage1(args: argparse.Namespace) -> dict[str, Any]:
     )
 
 
+def _verify_final_aggregate(
+    contract: CalibrationContract,
+    base_seal: RuntimeSeal,
+    seal: RuntimeSeal,
+) -> dict[str, Any]:
+    """Recompute the complete final artifact from its immutable source shards."""
+
+    stage1_verified = _verify_stage1_aggregate(contract, base_seal)
+    rebound_seal, receipt_binding, stage1_verified = (
+        _bind_verified_stage1_receipt(
+            contract, base_seal, stage1_verified=stage1_verified
+        )
+    )
+    _require_equal(
+        rebound_seal.to_dict(), seal.to_dict(), "final aggregate runtime seal"
+    )
+    top3 = _load_top3(_stage1_receipt_path(contract))
+    path = contract.output_root / str(
+        contract.execution["outputs"]["stage2_aggregate_directory"]
+    )
+    verified = verify_shard(
+        path, expected_seal_sha256=seal.global_runtime_seal_sha256
+    )
+    manifest = verified["manifest"]
+    complete = verified["complete"]
+    for value, expected, label in (
+        (
+            manifest.get("artifact_type"),
+            "binary_tent_source_calibration_final_aggregate",
+            "manifest artifact type",
+        ),
+        (manifest.get("record_count"), 468, "manifest record count"),
+        (manifest.get("episode_count"), 29952, "manifest episode count"),
+        (
+            manifest.get("total_episode_count"),
+            79872,
+            "manifest total episode count",
+        ),
+        (
+            manifest.get("fresh_stage2_process_count"),
+            2,
+            "manifest fresh process count",
+        ),
+        (
+            manifest.get("stage1_runtime_seal_sha256"),
+            base_seal.global_runtime_seal_sha256,
+            "manifest stage1 runtime seal",
+        ),
+        (
+            manifest.get("top3_receipt_sha256"),
+            receipt_binding.sha256,
+            "manifest top3 receipt SHA256",
+        ),
+        (
+            manifest.get("top3_in_frozen_order"),
+            [candidate.to_dict() for candidate in top3],
+            "manifest frozen top3",
+        ),
+        (complete.get("stage"), 2, "completion stage"),
+        (complete.get("record_count"), 468, "completion record count"),
+        (complete.get("episode_count"), 29952, "completion episode count"),
+        (
+            complete.get("total_episode_count"),
+            79872,
+            "completion total episode count",
+        ),
+        (
+            complete.get("top3_receipt_sha256"),
+            receipt_binding.sha256,
+            "completion top3 receipt SHA256",
+        ),
+        (
+            complete.get("stage1_runtime_seal_sha256"),
+            base_seal.global_runtime_seal_sha256,
+            "completion stage1 runtime seal",
+        ),
+        (complete.get("both_bn_protocols_retained"), True, "completion BN policy"),
+        (complete.get("scope"), dict(SCOPE), "completion scope"),
+    ):
+        _require_equal(value, expected, f"final aggregate {label}")
+    _require_equal(
+        set(_mapping(manifest.get("files"), "final aggregate files")),
+        {
+            "final_selection_receipt.json",
+            "stage2_records.jsonl",
+            "stage2_shard_index.json",
+            "provenance.json",
+            "runtime_seal.json",
+        },
+        "final aggregate exact primary files",
+    )
+    _require_equal(
+        _load_json(path / "runtime_seal.json"),
+        seal.to_dict(),
+        "final aggregate embedded runtime seal",
+    )
+    provenance = _load_json(path / "provenance.json")
+    _verify_embedded_scope(contract, manifest, label="final aggregate manifest")
+    _verify_embedded_scope(contract, provenance, label="final aggregate provenance")
+    for value, expected, label in (
+        (
+            provenance.get("artifact_type"),
+            "binary_tent_source_calibration_final_aggregate",
+            "provenance artifact type",
+        ),
+        (
+            provenance.get("global_runtime_seal_sha256"),
+            seal.global_runtime_seal_sha256,
+            "provenance runtime seal",
+        ),
+        (
+            provenance.get("stage1_runtime_seal_sha256"),
+            base_seal.global_runtime_seal_sha256,
+            "provenance stage1 runtime seal",
+        ),
+        (
+            provenance.get("top3_receipt_sha256"),
+            receipt_binding.sha256,
+            "provenance top3 receipt SHA256",
+        ),
+    ):
+        _require_equal(value, expected, f"final aggregate {label}")
+
+    stage2_root = contract.output_root / "stage2" / "shards"
+    _assert_no_symlink_ancestors(stage2_root, label="stage2 shard root")
+    if not stage2_root.is_dir() or stage2_root.is_symlink():
+        raise CalibrationExecutionError("stage2 shard root must be a real directory")
+    expected_paths = {
+        slot_index: _stage2_shard_path(
+            contract, _stage2_slot_process_id(receipt_binding.sha256, slot_index)
+        )
+        for slot_index in (1, 2)
+    }
+    _require_equal(
+        {entry.name for entry in stage2_root.iterdir()},
+        {entry.name for entry in expected_paths.values()},
+        "final aggregate exact source stage2 shard entries",
+    )
+    stage1_processes = {
+        str(record["process_id"]) for record in stage1_verified["records"]
+    }
+    stage2_processes: set[str] = set()
+    source_records: list[dict[str, Any]] = []
+    expected_index: list[dict[str, Any]] = []
+    for slot_index, shard_path in expected_paths.items():
+        source_shard = _verify_stage2_process_shard(
+            shard_path,
+            contract=contract,
+            seal=seal,
+            top3=top3,
+            expected_slot_index=slot_index,
+        )
+        process_id = str(source_shard["manifest"]["process_id"])
+        if process_id in stage1_processes or process_id in stage2_processes:
+            raise CalibrationExecutionError(
+                "final aggregate source process ID is reused or duplicated"
+            )
+        stage2_processes.add(process_id)
+        source_records.extend(source_shard["records"])
+        expected_index.append(
+            {
+                "process_id": process_id,
+                "slot_index": slot_index,
+                "artifact_manifest_sha256": source_shard["manifest_sha256"],
+            }
+        )
+    _require_equal(
+        verified["records"], source_records, "final aggregate/source stage2 records"
+    )
+    observed_index = _load_json(path / "stage2_shard_index.json")
+    _require_equal(
+        observed_index,
+        {"shards": expected_index},
+        "final aggregate/source stage2 shard index",
+    )
+    endpoint_invariants = _verify_cross_run_endpoint_invariants(
+        stage1_verified["records"], source_records
+    )
+    expected_receipt = {
+        **select_final_candidate(stage1_verified["records"], source_records),
+        "endpoint_invariants": endpoint_invariants,
+        **_scope_provenance(contract),
+    }
+    observed_receipt = _load_json(path / "final_selection_receipt.json")
+    _require_equal(
+        observed_receipt, expected_receipt, "final aggregate selection receipt"
+    )
+    _require_equal(
+        complete.get("selected_candidate"),
+        expected_receipt["selected_candidate"],
+        "final aggregate completion selected candidate",
+    )
+    _require_equal(
+        provenance.get("endpoint_invariants"),
+        endpoint_invariants,
+        "final aggregate provenance endpoint invariants",
+    )
+    return {
+        **verified,
+        "selection_receipt": observed_receipt,
+        "endpoint_invariants": endpoint_invariants,
+    }
+
+
 def aggregate_final(args: argparse.Namespace) -> dict[str, Any]:
     contract = load_contract(args.execution_config)
     base_seal, _caches = capture_runtime_seal(contract)
     stage1_verified = _verify_stage1_aggregate(contract, base_seal)
     receipt_path = _stage1_receipt_path(contract)
-    receipt_binding = _bound_file(
-        receipt_path, role="stage1_top3_receipt"
+    seal, receipt_binding, stage1_verified = _bind_verified_stage1_receipt(
+        contract, base_seal, stage1_verified=stage1_verified
     )
-    seal = _extend_runtime_seal(base_seal, receipt_binding)
     monitor = RuntimeSealMonitor(seal)
     monitor.assert_unchanged(
         stage="final_aggregate_process_entry", active_paths=(receipt_path,)
@@ -2415,13 +3692,29 @@ def aggregate_final(args: argparse.Namespace) -> dict[str, Any]:
     top3 = _load_top3(receipt_path)
     stage1_processes = {str(value["process_id"]) for value in stage1_records}
     stage2_root = contract.output_root / "stage2" / "shards"
-    paths = sorted(value for value in stage2_root.iterdir() if value.is_dir() and not value.name.startswith("."))
-    _require_equal(len(paths), 2, "stage2 fresh process shard count")
+    expected_paths = {
+        slot_index: _stage2_shard_path(
+            contract, _stage2_slot_process_id(receipt_binding.sha256, slot_index)
+        )
+        for slot_index in (1, 2)
+    }
+    entries = tuple(stage2_root.iterdir())
+    _require_equal(
+        {value.name for value in entries},
+        {value.name for value in expected_paths.values()},
+        "stage2 exact deterministic shard entries (including hidden entries)",
+    )
     stage2_records: list[dict[str, Any]] = []
     process_ids: set[str] = set()
     shard_index: list[dict[str, Any]] = []
-    for path in paths:
-        verified = _verify_stage2_process_shard(path, seal=seal, top3=top3)
+    for slot_index, path in expected_paths.items():
+        verified = _verify_stage2_process_shard(
+            path,
+            contract=contract,
+            seal=seal,
+            top3=top3,
+            expected_slot_index=slot_index,
+        )
         manifest = verified["manifest"]
         process_id = str(manifest["process_id"])
         if process_id in process_ids or process_id in stage1_processes:
@@ -2439,11 +3732,16 @@ def aggregate_final(args: argparse.Namespace) -> dict[str, Any]:
         shard_index.append(
             {
                 "process_id": process_id,
+                "slot_index": slot_index,
                 "artifact_manifest_sha256": verified["manifest_sha256"],
             }
         )
+    endpoint_invariants = _verify_cross_run_endpoint_invariants(
+        stage1_records, stage2_records
+    )
     receipt = {
         **select_final_candidate(stage1_records, stage2_records),
+        "endpoint_invariants": endpoint_invariants,
         **_scope_provenance(contract),
     }
     monitor.assert_unchanged(stage="final_aggregate_pre_publish", full_byte_rehash=True)
@@ -2455,10 +3753,12 @@ def aggregate_final(args: argparse.Namespace) -> dict[str, Any]:
         "stage1_runtime_seal_sha256": base_seal.global_runtime_seal_sha256,
         "top3_receipt_sha256": receipt_binding.sha256,
         "runtime_audits": monitor.audits,
+        "endpoint_invariants": endpoint_invariants,
         **_scope_provenance(contract),
     }
-    return _publish_directory(
+    published = _publish_directory(
         final=destination,
+        work_root=contract.publication_work_root,
         primary_files={
             "final_selection_receipt.json": receipt,
             "stage2_records.jsonl": stage2_records,
@@ -2469,25 +3769,34 @@ def aggregate_final(args: argparse.Namespace) -> dict[str, Any]:
         manifest_metadata={
             "artifact_type": "binary_tent_source_calibration_final_aggregate",
             "record_count": 468,
-            "stage2_episode_count": 29952,
+            "episode_count": 29952,
             "total_episode_count": 79872,
             "fresh_stage2_process_count": 2,
             "global_runtime_seal_sha256": seal.global_runtime_seal_sha256,
             "stage1_runtime_seal_sha256": base_seal.global_runtime_seal_sha256,
             "top3_receipt_sha256": receipt_binding.sha256,
+            "top3_in_frozen_order": [value.to_dict() for value in top3],
             **_scope_provenance(contract),
         },
         completion_metadata={
             "stage": 2,
             "record_count": 468,
-            "stage2_episode_count": 29952,
+            "episode_count": 29952,
             "total_episode_count": 79872,
+            "top3_receipt_sha256": receipt_binding.sha256,
+            "stage1_runtime_seal_sha256": base_seal.global_runtime_seal_sha256,
             "selected_candidate": receipt["selected_candidate"],
             "both_bn_protocols_retained": True,
             "global_runtime_seal_sha256": seal.global_runtime_seal_sha256,
             "scope": dict(SCOPE),
         },
     )
+    verified_final = _verify_final_aggregate(contract, base_seal, seal)
+    return {
+        **published,
+        "post_publish_verified": True,
+        "verified_manifest_sha256": verified_final["manifest_sha256"],
+    }
 
 
 def validate_only(args: argparse.Namespace) -> dict[str, Any]:
@@ -2512,6 +3821,9 @@ def validate_only(args: argparse.Namespace) -> dict[str, Any]:
         "bound_file_count": len(seal.bindings),
         "cache_tensor_arrays_loaded": 0,
         "cache_payloads_opaque_byte_hashed_without_numpy_load": True,
+        "target_access_audit": _target_access_audit(
+            tensor_evaluation_completed=False
+        ),
         "parent_pilot_artifact_chains_verified": True,
         "source_train_and_test_split_hashes_verified": True,
         "cache_parent_pilot_tensor_hash_equality_verified": True,
@@ -2539,6 +3851,7 @@ def run_gpu_smoke(args: argparse.Namespace) -> dict[str, Any]:
     monitor = RuntimeSealMonitor(seal)
     monitor.assert_unchanged(stage="gpu_smoke_process_entry")
     device = _configure_cuda_worker(contract, args.device)
+    worker_environment = _observed_worker_environment(device)
     dataset = "IRSTD-1K"
     candidate = Candidate.from_values("Adam", "1e-5")
     corruption, severity = ("clean", 0)
@@ -2612,6 +3925,10 @@ def run_gpu_smoke(args: argparse.Namespace) -> dict[str, Any]:
         "test_image_opens": 0,
         "test_label_opens": 0,
         "method_label_accesses": 0,
+        "worker_environment": worker_environment,
+        "target_access_audit": _target_access_audit(
+            tensor_evaluation_completed=False
+        ),
         **_scope_provenance(contract),
     }
 
@@ -2620,16 +3937,253 @@ def _fresh_process_id(prefix: str) -> str:
     return _safe_slug(f"{prefix}-{uuid.uuid4().hex[:16]}")
 
 
-def _worker_environment(gpu_id: str) -> dict[str, str]:
+_INHERITED_GPU_LEASE_FDS: list[int] = []
+
+
+def _install_linux_parent_death_guard(expected_parent_pid: int) -> None:
+    """Child-side pre-exec hook: die with the launcher and close the race."""
+
+    if not sys.platform.startswith("linux"):
+        os._exit(127)
+    libc = ctypes.CDLL(None, use_errno=True)
+    prctl = getattr(libc, "prctl", None)
+    if prctl is None:
+        os._exit(127)
+    prctl.argtypes = (
+        ctypes.c_int,
+        ctypes.c_ulong,
+        ctypes.c_ulong,
+        ctypes.c_ulong,
+        ctypes.c_ulong,
+    )
+    prctl.restype = ctypes.c_int
+    if prctl(PR_SET_PDEATHSIG, int(signal.SIGTERM), 0, 0, 0) != 0:
+        os._exit(127)
+    # The parent could have died between fork() and prctl().
+    if os.getppid() != int(expected_parent_pid):
+        os.kill(os.getpid(), signal.SIGTERM)
+        os._exit(128 + int(signal.SIGTERM))
+
+
+def _get_linux_parent_death_signal() -> int:
+    if not sys.platform.startswith("linux"):
+        raise CalibrationExecutionError("parent-death signal verification requires Linux")
+    libc = ctypes.CDLL(None, use_errno=True)
+    prctl = getattr(libc, "prctl", None)
+    if prctl is None:
+        raise CalibrationExecutionError("libc prctl is unavailable")
+    observed = ctypes.c_int(0)
+    prctl.argtypes = (
+        ctypes.c_int,
+        ctypes.c_void_p,
+        ctypes.c_ulong,
+        ctypes.c_ulong,
+        ctypes.c_ulong,
+    )
+    prctl.restype = ctypes.c_int
+    if prctl(PR_GET_PDEATHSIG, ctypes.byref(observed), 0, 0, 0) != 0:
+        error_number = ctypes.get_errno()
+        raise OSError(error_number, os.strerror(error_number))
+    return int(observed.value)
+
+
+def _verify_inherited_gpu_lease(*, required: bool = False) -> dict[str, Any]:
+    """Keep and verify the launcher's flock descriptor for worker lifetime."""
+
+    raw_fd = os.environ.get("CALIBRATION_GPU_LEASE_FD")
+    raw_parent = os.environ.get("CALIBRATION_LAUNCHER_PID")
+    raw_gpu = os.environ.get("CALIBRATION_PHYSICAL_GPU_ID")
+    raw_stage_claims = os.environ.get("CALIBRATION_STAGE_CLAIM_FDS")
+    if (
+        raw_fd is None
+        and raw_parent is None
+        and raw_gpu is None
+        and raw_stage_claims is None
+    ):
+        if required:
+            raise CalibrationExecutionError(
+                "formal worker requires an inherited physical-GPU lease"
+            )
+        return {"launcher_managed": False}
+    if raw_fd is None or raw_parent is None or raw_gpu is None:
+        raise CalibrationExecutionError(
+            "incomplete inherited physical-GPU lease environment"
+        )
+    gpu_id = _canonical_physical_gpu_id(
+        raw_gpu, label="inherited physical GPU ID"
+    )
+    if required and not raw_stage_claims:
+        raise CalibrationExecutionError(
+            "formal worker requires an inherited stage-launcher claim descriptor"
+        )
+    try:
+        descriptor = int(raw_fd)
+        expected_parent = int(raw_parent)
+    except ValueError as error:
+        raise CalibrationExecutionError(
+            "invalid inherited physical-GPU lease descriptor/parent PID"
+        ) from error
+    try:
+        stat = os.fstat(descriptor)
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        os.set_inheritable(descriptor, False)
+    except OSError as error:
+        raise CalibrationExecutionError(
+            "worker did not inherit a live physical-GPU flock descriptor"
+        ) from error
+    if os.getppid() != expected_parent:
+        raise CalibrationExecutionError(
+            "worker launcher parent PID changed before process entry"
+        )
+    _require_equal(
+        _get_linux_parent_death_signal(),
+        int(signal.SIGTERM),
+        "worker Linux parent-death signal",
+    )
+    if descriptor not in _INHERITED_GPU_LEASE_FDS:
+        _INHERITED_GPU_LEASE_FDS.append(descriptor)
+    stage_claim_descriptors: list[int] = []
+    if raw_stage_claims:
+        try:
+            stage_claim_descriptors = [
+                int(value) for value in raw_stage_claims.split(",")
+            ]
+        except ValueError as error:
+            raise CalibrationExecutionError(
+                "invalid inherited stage-launcher claim descriptor"
+            ) from error
+        if not stage_claim_descriptors or len(stage_claim_descriptors) != len(
+            set(stage_claim_descriptors)
+        ):
+            raise CalibrationExecutionError(
+                "stage-launcher claim descriptors must be unique and non-empty"
+            )
+        for stage_descriptor in stage_claim_descriptors:
+            if stage_descriptor == descriptor:
+                raise CalibrationExecutionError(
+                    "GPU lease and stage-launcher claim descriptors must differ"
+                )
+            try:
+                os.fstat(stage_descriptor)
+                os.set_inheritable(stage_descriptor, False)
+            except OSError as error:
+                raise CalibrationExecutionError(
+                    "worker did not inherit a live stage-launcher claim descriptor"
+                ) from error
+            if stage_descriptor not in _INHERITED_GPU_LEASE_FDS:
+                _INHERITED_GPU_LEASE_FDS.append(stage_descriptor)
+    return {
+        "launcher_managed": True,
+        "physical_gpu_id": gpu_id,
+        "lease_fd": descriptor,
+        "lease_device": int(stat.st_dev),
+        "lease_inode": int(stat.st_ino),
+        "launcher_pid": expected_parent,
+        "linux_parent_death_signal": "SIGTERM",
+        "worker_holds_lease_for_process_lifetime": True,
+        "stage_launcher_claim_fd_inherited_for_process_lifetime": bool(
+            stage_claim_descriptors
+        ),
+    }
+
+
+def _validate_formal_gpu_lease(
+    contract: CalibrationContract,
+    lease: Mapping[str, Any],
+    *,
+    device_text: str,
+) -> dict[str, Any]:
+    """Bind a formal worker's inherited descriptor to its configured GPU path."""
+
+    _require_equal(
+        lease.get("launcher_managed"), True, "formal worker launcher-managed lease"
+    )
+    _require_equal(
+        lease.get("stage_launcher_claim_fd_inherited_for_process_lifetime"),
+        True,
+        "formal worker inherited stage-launcher claim",
+    )
+    _require_equal(device_text, "cuda:0", "formal worker logical CUDA device")
+    gpu_id = _canonical_physical_gpu_id(
+        lease.get("physical_gpu_id"), label="formal physical GPU lease ID"
+    )
+    _require_equal(
+        os.environ.get("CUDA_VISIBLE_DEVICES"),
+        gpu_id,
+        "physical GPU lease/CUDA_VISIBLE_DEVICES",
+    )
+    configured_directory = _project_path(
+        str(contract.execution["launcher"]["physical_gpu_lease_directory"])
+    )
+    expected_directory = (
+        contract.output_root.parent / ".source_calibration_physical_gpu_leases"
+    ).resolve()
+    _require_equal(
+        configured_directory,
+        expected_directory,
+        "configured/derived physical GPU lease directory",
+    )
+    lease_path = configured_directory / f"physical-gpu-{gpu_id}.lock"
+    if not lease_path.is_file() or lease_path.is_symlink():
+        raise CalibrationExecutionError(
+            f"physical GPU lease path missing/non-regular/symlink: {lease_path}"
+        )
+    path_stat = lease_path.stat()
+    if not stat_module.S_ISREG(path_stat.st_mode):
+        raise CalibrationExecutionError(
+            f"physical GPU lease path is not a regular file: {lease_path}"
+        )
+    _require_equal(
+        (int(lease["lease_device"]), int(lease["lease_inode"])),
+        (int(path_stat.st_dev), int(path_stat.st_ino)),
+        "inherited descriptor/configured GPU lease inode",
+    )
+    return {
+        "launcher_managed": True,
+        "physical_gpu_id": gpu_id,
+        "lease_path": str(lease_path),
+        "lease_device": int(path_stat.st_dev),
+        "lease_inode": int(path_stat.st_ino),
+        "launcher_pid": int(lease["launcher_pid"]),
+        "linux_parent_death_signal": "SIGTERM",
+        "worker_parent_pid_guard_verified": True,
+        "worker_holds_lease_for_process_lifetime": True,
+        "stage_launcher_claim_fd_inherited_for_process_lifetime": True,
+    }
+
+
+def _worker_environment(
+    gpu_id: str,
+    *,
+    lease_fd: int | None = None,
+    launcher_pid: int | None = None,
+    stage_claim_fds: Sequence[int] = (),
+) -> dict[str, str]:
+    gpu_id = _canonical_physical_gpu_id(gpu_id, label="worker physical GPU ID")
     environment = dict(os.environ)
     environment.update(
         {
             "CUDA_VISIBLE_DEVICES": gpu_id,
+            "CUDA_DEVICE_ORDER": "PCI_BUS_ID",
             "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
             "PYTHONHASHSEED": "42",
             "PYTHONUNBUFFERED": "1",
         }
     )
+    if lease_fd is not None:
+        if launcher_pid is None:
+            raise ValueError("launcher_pid is required with a GPU lease descriptor")
+        environment.update(
+            {
+                "CALIBRATION_GPU_LEASE_FD": str(lease_fd),
+                "CALIBRATION_LAUNCHER_PID": str(launcher_pid),
+                "CALIBRATION_PHYSICAL_GPU_ID": gpu_id,
+            }
+        )
+    if stage_claim_fds:
+        environment["CALIBRATION_STAGE_CLAIM_FDS"] = ",".join(
+            str(int(value)) for value in stage_claim_fds
+        )
     return environment
 
 
@@ -2645,15 +4199,28 @@ def _terminate_kill_and_reap(
         if marker not in seen:
             seen.add(marker)
             unique.append(process)
+    cleanup_errors: list[str] = []
+
+    def is_live(process: subprocess.Popen[Any]) -> bool:
+        try:
+            return process.poll() is None
+        except BaseException as error:
+            cleanup_errors.append(f"poll pid={process.pid} failed: {error!r}")
+            return True
+
     for process in unique:
-        if process.poll() is None:
+        if is_live(process):
             try:
                 process.terminate()
             except ProcessLookupError:
                 pass
+            except BaseException as error:
+                cleanup_errors.append(
+                    f"terminate pid={process.pid} failed: {error!r}"
+                )
     deadline = time.monotonic() + float(timeout_seconds)
     for process in unique:
-        if process.poll() is not None:
+        if not is_live(process):
             continue
         remaining = max(0.0, deadline - time.monotonic())
         if remaining <= 0:
@@ -2662,18 +4229,52 @@ def _terminate_kill_and_reap(
             process.wait(timeout=remaining)
         except subprocess.TimeoutExpired:
             pass
+        except ChildProcessError:
+            pass
+        except BaseException as error:
+            cleanup_errors.append(
+                f"post-terminate wait pid={process.pid} failed: {error!r}"
+            )
     for process in unique:
-        if process.poll() is None:
+        if is_live(process):
             try:
                 process.kill()
             except ProcessLookupError:
                 pass
+            except BaseException as error:
+                cleanup_errors.append(f"kill pid={process.pid} failed: {error!r}")
+    unreaped: list[int] = []
     for process in unique:
         try:
-            process.wait()
+            process.wait(timeout=float(timeout_seconds))
+        except subprocess.TimeoutExpired:
+            unreaped.append(int(process.pid))
         except ChildProcessError:
             # Already reaped by a platform-specific Popen.poll implementation.
             pass
+        except BaseException as error:
+            cleanup_errors.append(
+                f"post-kill wait pid={process.pid} failed: {error!r}"
+            )
+    if unreaped or cleanup_errors:
+        raise CalibrationExecutionError(
+            "worker cleanup was incomplete: "
+            f"unreaped={unreaped}, errors={cleanup_errors}"
+        )
+
+
+def _emit_launcher_scheduler_event(value: Mapping[str, Any]) -> None:
+    print(
+        json.dumps(
+            dict(value),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=JSON_SEPARATORS,
+            allow_nan=False,
+        ),
+        file=sys.stderr,
+        flush=True,
+    )
 
 
 def _run_parallel(
@@ -2683,6 +4284,9 @@ def _run_parallel(
     max_parallel: int | None = None,
     termination_timeout_seconds: float = 10.0,
     poll_interval_seconds: float = 0.2,
+    slot_lock_directory: Path | None = None,
+    inherited_guard_fds: Sequence[int] = (),
+    lease_wait_heartbeat_seconds: float = 30.0,
 ) -> list[dict[str, Any]]:
     """Schedule one live worker per physical-GPU slot and reuse freed slots."""
 
@@ -2691,31 +4295,140 @@ def _run_parallel(
         if len(legacy) != len(commands):
             raise TypeError("gpu_ids are required for unassigned worker commands")
         gpu_ids = tuple(dict.fromkeys(str(value[1]) for value in legacy))
-    slots = tuple(str(value) for value in gpu_ids)
+    slots = tuple(
+        _canonical_physical_gpu_id(str(value), label="scheduler physical GPU ID")
+        for value in gpu_ids
+    )
     if not slots or len(slots) != len(set(slots)):
         raise CalibrationExecutionError("physical GPU slots must be unique and non-empty")
     if max_parallel is not None and int(max_parallel) != len(slots):
         raise CalibrationExecutionError(
             "max_parallel must equal the number of exclusive physical GPU slots"
         )
-    if termination_timeout_seconds <= 0 or poll_interval_seconds < 0:
+    if (
+        termination_timeout_seconds <= 0
+        or poll_interval_seconds < 0
+        or lease_wait_heartbeat_seconds <= 0
+    ):
         raise ValueError("scheduler timeouts must be non-negative and termination positive")
+    if slot_lock_directory is not None and not sys.platform.startswith("linux"):
+        raise CalibrationExecutionError(
+            "inherited physical-GPU leases and parent-death guards require Linux"
+        )
+    guard_fds = tuple(dict.fromkeys(int(value) for value in inherited_guard_fds))
+    for descriptor in guard_fds:
+        os.fstat(descriptor)
     pending = [value[0] if isinstance(value, tuple) else value for value in commands]
     active: dict[str, tuple[subprocess.Popen[Any], list[str]]] = {}
+    slot_leases: dict[str, int] = {}
     assignments: list[dict[str, Any]] = []
+    primary_error: BaseException | None = None
+    scheduler_started = time.monotonic()
+    last_lease_wait_heartbeat: float | None = None
     try:
         while pending or active:
+            spawned = False
+            lease_blocked_slots: list[str] = []
             for gpu in slots:
                 if not pending:
                     break
                 if gpu in active:
                     continue
+                lease_fd: int | None = None
+                if slot_lock_directory is not None:
+                    lease_path = slot_lock_directory / f"physical-gpu-{gpu}.lock"
+                    try:
+                        lease_fd = _acquire_recoverable_flock(
+                            lease_path, owner=f"physical-gpu:{gpu}"
+                        )
+                    except BlockingIOError:
+                        lease_blocked_slots.append(gpu)
+                        continue
                 command = pending.pop(0)
-                process = subprocess.Popen(command, env=_worker_environment(gpu))
+                try:
+                    if lease_fd is None:
+                        process = subprocess.Popen(
+                            command,
+                            env=_worker_environment(gpu),
+                            stdout=subprocess.DEVNULL,
+                        )
+                    else:
+                        launcher_pid = os.getpid()
+                        process = subprocess.Popen(
+                            command,
+                            env=_worker_environment(
+                                gpu,
+                                lease_fd=lease_fd,
+                                launcher_pid=launcher_pid,
+                                stage_claim_fds=guard_fds,
+                            ),
+                            pass_fds=tuple(dict.fromkeys((lease_fd, *guard_fds))),
+                            preexec_fn=lambda expected=launcher_pid: (
+                                _install_linux_parent_death_guard(expected)
+                            ),
+                            stdout=subprocess.DEVNULL,
+                        )
+                except BaseException:
+                    if lease_fd is not None:
+                        os.close(lease_fd)
+                    raise
                 active[gpu] = (process, command)
-                assignments.append(
-                    {"gpu_id": gpu, "pid": process.pid, "command": list(command)}
+                if lease_fd is not None:
+                    slot_leases[gpu] = lease_fd
+                spawned = True
+                assignment = {
+                    "gpu_id": gpu,
+                    "pid": process.pid,
+                    "command": list(command),
+                    "worker_inherits_gpu_lease": lease_fd is not None,
+                    "linux_parent_death_signal": (
+                        "SIGTERM" if lease_fd is not None else None
+                    ),
+                }
+                assignments.append(assignment)
+                _emit_launcher_scheduler_event(
+                    {
+                        "event": "binary_tent_source_calibration_worker_assigned",
+                        "physical_gpu_id": gpu,
+                        "pid": int(process.pid),
+                        "pending_worker_count": len(pending),
+                        "slots": {
+                            "configured": list(slots),
+                            "active": sorted(active),
+                        },
+                        "elapsed_seconds": round(
+                            time.monotonic() - scheduler_started, 6
+                        ),
+                        "unix_time_ns": time.time_ns(),
+                    }
                 )
+
+            heartbeat_now = time.monotonic()
+            if (
+                pending
+                and lease_blocked_slots
+                and (
+                    last_lease_wait_heartbeat is None
+                    or heartbeat_now - last_lease_wait_heartbeat
+                    >= float(lease_wait_heartbeat_seconds)
+                )
+            ):
+                _emit_launcher_scheduler_event(
+                    {
+                        "event": "binary_tent_source_calibration_gpu_lease_wait",
+                        "pending_worker_count": len(pending),
+                        "slots": {
+                            "configured": list(slots),
+                            "active": sorted(active),
+                            "lease_blocked": sorted(set(lease_blocked_slots)),
+                        },
+                        "elapsed_seconds": round(
+                            heartbeat_now - scheduler_started, 6
+                        ),
+                        "unix_time_ns": time.time_ns(),
+                    }
+                )
+                last_lease_wait_heartbeat = heartbeat_now
 
             completed_slots: list[str] = []
             failure: tuple[int, list[str], str] | None = None
@@ -2728,43 +4441,173 @@ def _run_parallel(
                 if code != 0 and failure is None:
                     failure = (int(code), command, gpu)
             if failure is not None:
-                _terminate_kill_and_reap(
-                    [value[0] for value in active.values()],
-                    timeout_seconds=termination_timeout_seconds,
-                )
-                active.clear()
                 raise CalibrationExecutionError(
                     f"worker exited {failure[0]} on physical GPU {failure[2]}: "
                     f"{' '.join(failure[1])}"
                 )
             for gpu in completed_slots:
                 active.pop(gpu)
-            if active and not completed_slots and poll_interval_seconds:
+                lease_fd = slot_leases.get(gpu)
+                if lease_fd is not None:
+                    os.close(lease_fd)
+                    slot_leases.pop(gpu)
+            if (
+                (active or pending)
+                and not completed_slots
+                and not spawned
+                and poll_interval_seconds
+            ):
                 time.sleep(poll_interval_seconds)
-    except BaseException:
+    except BaseException as error:
+        primary_error = error
+
+    if primary_error is not None:
+        cleanup_errors: list[str] = []
+        try:
+            if active:
+                _terminate_kill_and_reap(
+                    [value[0] for value in active.values()],
+                    timeout_seconds=termination_timeout_seconds,
+                )
+        except BaseException as cleanup_error:
+            cleanup_errors.append(
+                f"worker termination/reap failed: {cleanup_error!r}"
+            )
+        finally:
+            active.clear()
+            for gpu, lease_fd in tuple(slot_leases.items()):
+                try:
+                    os.close(lease_fd)
+                except OSError as close_error:
+                    cleanup_errors.append(
+                        f"GPU {gpu} lease close failed: {close_error!r}"
+                    )
+                finally:
+                    slot_leases.pop(gpu, None)
+        if cleanup_errors:
+            raise CalibrationExecutionError(
+                f"scheduler failed with {primary_error!r}; cleanup also failed: "
+                + "; ".join(cleanup_errors)
+            ) from primary_error
+        raise primary_error.with_traceback(primary_error.__traceback__)
+
+    # Successful completion should leave no live worker or held lease; keep a
+    # defensive close here so a future scheduler change cannot leak a lock.
+    success_cleanup_errors: list[str] = []
+    try:
         if active:
             _terminate_kill_and_reap(
                 [value[0] for value in active.values()],
                 timeout_seconds=termination_timeout_seconds,
             )
-            active.clear()
-        raise
+    except BaseException as cleanup_error:
+        success_cleanup_errors.append(repr(cleanup_error))
+    finally:
+        active.clear()
+        for gpu, lease_fd in tuple(slot_leases.items()):
+            try:
+                os.close(lease_fd)
+            except OSError as close_error:
+                success_cleanup_errors.append(
+                    f"GPU {gpu} lease close failed: {close_error!r}"
+                )
+            finally:
+                slot_leases.pop(gpu, None)
+    if success_cleanup_errors:
+        raise CalibrationExecutionError(
+            "scheduler success cleanup failed: " + "; ".join(success_cleanup_errors)
+        )
     return assignments
 
 
 def _gpu_ids(raw: str) -> tuple[str, ...]:
-    values = tuple(value.strip() for value in raw.split(",") if value.strip())
-    if len(values) != 2 or len(set(values)) != 2 or any(not value.isdigit() for value in values):
-        raise argparse.ArgumentTypeError("--gpu-ids requires two distinct physical IDs, e.g. 1,2")
-    return values
+    values = tuple(raw.split(","))
+    if len(values) != 2:
+        raise argparse.ArgumentTypeError(
+            "--gpu-ids requires two distinct canonical physical IDs, e.g. 1,2"
+        )
+    try:
+        canonical = tuple(
+            _canonical_physical_gpu_id(value, label="--gpu-ids value")
+            for value in values
+        )
+    except CalibrationExecutionError as error:
+        raise argparse.ArgumentTypeError(str(error)) from error
+    if len({int(value, 10) for value in canonical}) != 2:
+        raise argparse.ArgumentTypeError(
+            "--gpu-ids requires two distinct canonical physical IDs, e.g. 1,2"
+        )
+    return canonical
+
+
+def _with_stage_launcher_lock(
+    contract: CalibrationContract,
+    *,
+    stage: str,
+    action: Callable[[int], dict[str, Any]],
+) -> dict[str, Any]:
+    work_root = contract.publication_work_root
+    work_root.mkdir(parents=True, exist_ok=True)
+    if not work_root.is_dir() or work_root.is_symlink():
+        raise CalibrationExecutionError(
+            f"launcher work root must be a real directory: {work_root}"
+        )
+    _require_equal(
+        int(work_root.stat().st_dev),
+        int(contract.output_root.parent.stat().st_dev),
+        "launcher work/output filesystem device",
+    )
+    lock_path = work_root / f".{stage}.launcher.lock"
+    try:
+        descriptor = _acquire_recoverable_flock(
+            lock_path, owner=f"{stage}-launcher"
+        )
+    except BlockingIOError as error:
+        raise CalibrationExecutionError(
+            f"another {stage} launcher holds the scan/run/verify claim"
+        ) from error
+    try:
+        return action(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def launch_stage1(args: argparse.Namespace) -> dict[str, Any]:
     contract = load_contract(args.execution_config)
     gpu_ids = _gpu_ids(args.gpu_ids)
+    return _with_stage_launcher_lock(
+        contract,
+        stage="stage1",
+        action=lambda descriptor: _launch_stage1_locked(
+            args, contract, gpu_ids, descriptor
+        ),
+    )
+
+
+def _launch_stage1_locked(
+    args: argparse.Namespace,
+    contract: CalibrationContract,
+    gpu_ids: tuple[str, ...],
+    stage_claim_fd: int,
+) -> dict[str, Any]:
     seal, _caches = capture_runtime_seal(contract)
     monitor = RuntimeSealMonitor(seal)
     monitor.assert_unchanged(stage="stage1_launcher_entry")
+    stage1_root = contract.output_root / "stage1" / "shards"
+    expected_names = {candidate_slug(candidate) for candidate in ALL_CANDIDATES}
+    if stage1_root.exists() or stage1_root.is_symlink():
+        if not stage1_root.is_dir() or stage1_root.is_symlink():
+            raise CalibrationExecutionError(
+                "stage1 shard root must be a real directory"
+            )
+        unexpected = sorted(
+            value.name for value in stage1_root.iterdir() if value.name not in expected_names
+        )
+        if unexpected:
+            raise CalibrationExecutionError(
+                "stage1 shard directory contains unexpected/hidden entries; "
+                f"fail closed without deletion: {unexpected}"
+            )
     commands: list[list[str]] = []
     skipped: list[dict[str, Any]] = []
     for candidate in ALL_CANDIDATES:
@@ -2802,9 +4645,17 @@ def launch_stage1(args: argparse.Namespace) -> dict[str, Any]:
         commands,
         gpu_ids,
         termination_timeout_seconds=timeout,
+        slot_lock_directory=(
+            contract.output_root.parent / ".source_calibration_physical_gpu_leases"
+        ),
+        inherited_guard_fds=(stage_claim_fd,),
+        lease_wait_heartbeat_seconds=float(
+            contract.execution["launcher"]["lease_wait_heartbeat_seconds"]
+        ),
     )
     monitor.assert_unchanged(stage="stage1_launcher_workers_complete", full_byte_rehash=True)
     verified_process_ids: set[str] = set()
+    verified_records: list[dict[str, Any]] = []
     for candidate in ALL_CANDIDATES:
         verified = _verify_stage1_candidate_shard(contract, seal, candidate)
         process_id = str(verified["manifest"]["process_id"])
@@ -2813,6 +4664,11 @@ def launch_stage1(args: argparse.Namespace) -> dict[str, Any]:
                 "stage1 safe-resume set contains duplicate process IDs"
             )
         verified_process_ids.add(process_id)
+        verified_records.extend(verified["records"])
+    endpoint_invariants = _verify_cross_run_endpoint_invariants(verified_records)
+    # Safe-resume is not complete until the selector has re-parsed every
+    # record, including the test/label-open firewall and endpoint semantics.
+    select_stage1_top3(verified_records)
     return {
         "launched": len(commands),
         "skipped_current_runtime_seal": len(skipped),
@@ -2821,36 +4677,79 @@ def launch_stage1(args: argparse.Namespace) -> dict[str, Any]:
         "assignments": assignments,
         "safe_resume_verified": skipped,
         "global_runtime_seal_sha256": seal.global_runtime_seal_sha256,
+        "endpoint_invariants": endpoint_invariants,
+        "selector_semantics_verified": True,
     }
 
 
 def launch_stage2(args: argparse.Namespace) -> dict[str, Any]:
     contract = load_contract(args.execution_config)
     gpu_ids = _gpu_ids(args.gpu_ids)
+    return _with_stage_launcher_lock(
+        contract,
+        stage="stage2",
+        action=lambda descriptor: _launch_stage2_locked(
+            args, contract, gpu_ids, descriptor
+        ),
+    )
+
+
+def _launch_stage2_locked(
+    args: argparse.Namespace,
+    contract: CalibrationContract,
+    gpu_ids: tuple[str, ...],
+    stage_claim_fd: int,
+) -> dict[str, Any]:
     receipt = _resolve_top3_receipt(contract, getattr(args, "top3_receipt", None))
     base_seal, _caches = capture_runtime_seal(contract)
-    _verify_stage1_aggregate(contract, base_seal)
-    receipt_binding = _bound_file(
-        receipt, role="stage1_top3_receipt"
+    stage1_verified = _verify_stage1_aggregate(contract, base_seal)
+    seal, receipt_binding, stage1_verified = _bind_verified_stage1_receipt(
+        contract, base_seal, stage1_verified=stage1_verified
     )
-    seal = _extend_runtime_seal(base_seal, receipt_binding)
     monitor = RuntimeSealMonitor(seal)
     monitor.assert_unchanged(
         stage="stage2_launcher_entry", active_paths=(receipt,)
     )
     top3 = _load_top3(receipt)
     stage2_root = contract.output_root / "stage2" / "shards"
-    if stage2_root.exists():
+    expected_process_ids = {
+        slot_index: _stage2_slot_process_id(receipt_binding.sha256, slot_index)
+        for slot_index in (1, 2)
+    }
+    expected_names = set(expected_process_ids.values())
+    if stage2_root.exists() or stage2_root.is_symlink():
+        if not stage2_root.is_dir() or stage2_root.is_symlink():
+            raise CalibrationExecutionError(
+                "stage2 shard root must be a real directory"
+            )
         existing = tuple(stage2_root.iterdir())
-        if existing:
-            raise FileExistsError(
-                f"refusing stage2 launch with existing shard entries: {stage2_root}"
+        unexpected = sorted(value.name for value in existing if value.name not in expected_names)
+        if unexpected:
+            raise CalibrationExecutionError(
+                "stage2 shard directory contains unexpected/hidden entries; "
+                f"fail closed without deletion: {unexpected}"
             )
     commands: list[list[str]] = []
-    process_ids: list[str] = []
-    for index, gpu in enumerate(gpu_ids, start=1):
-        process_id = _fresh_process_id(f"stage2-process-{index}")
-        process_ids.append(process_id)
+    skipped: list[dict[str, Any]] = []
+    for index in (1, 2):
+        process_id = expected_process_ids[index]
+        destination = _stage2_shard_path(contract, process_id)
+        if destination.exists() or destination.is_symlink():
+            verified = _verify_stage2_process_shard(
+                destination,
+                contract=contract,
+                seal=seal,
+                top3=top3,
+                expected_slot_index=index,
+            )
+            skipped.append(
+                {
+                    "slot_index": index,
+                    "process_id": process_id,
+                    "artifact_manifest_sha256": verified["manifest_sha256"],
+                }
+            )
+            continue
         command = [
             sys.executable,
             str(Path(__file__).resolve()),
@@ -2861,6 +4760,8 @@ def launch_stage2(args: argparse.Namespace) -> dict[str, Any]:
             str(receipt),
             "--process-id",
             process_id,
+            "--slot-index",
+            str(index),
             "--device",
             "cuda:0",
         ]
@@ -2872,20 +4773,43 @@ def launch_stage2(args: argparse.Namespace) -> dict[str, Any]:
         commands,
         gpu_ids,
         termination_timeout_seconds=timeout,
+        slot_lock_directory=(
+            contract.output_root.parent / ".source_calibration_physical_gpu_leases"
+        ),
+        inherited_guard_fds=(stage_claim_fd,),
+        lease_wait_heartbeat_seconds=float(
+            contract.execution["launcher"]["lease_wait_heartbeat_seconds"]
+        ),
     )
     monitor.assert_unchanged(stage="stage2_launcher_workers_complete", full_byte_rehash=True)
-    for process_id in process_ids:
-        _verify_stage2_process_shard(
-            _stage2_shard_path(contract, process_id), seal=seal, top3=top3
+    stage2_records: list[dict[str, Any]] = []
+    for slot_index, process_id in expected_process_ids.items():
+        verified = _verify_stage2_process_shard(
+            _stage2_shard_path(contract, process_id),
+            contract=contract,
+            seal=seal,
+            top3=top3,
+            expected_slot_index=slot_index,
         )
+        stage2_records.extend(verified["records"])
+    endpoint_invariants = _verify_cross_run_endpoint_invariants(
+        stage1_verified["records"], stage2_records
+    )
+    # Re-run the full three-run selector contract before declaring launcher
+    # completion; structural shard verification alone is insufficient.
+    select_final_candidate(stage1_verified["records"], stage2_records)
     return {
-        "launched": 2,
-        "fresh_processes": 2,
+        "launched": len(commands),
+        "skipped_current_runtime_seal": len(skipped),
+        "fresh_processes": len(commands),
         "gpu_ids": list(gpu_ids),
         "assignments": assignments,
         "global_runtime_seal_sha256": seal.global_runtime_seal_sha256,
         "top3_receipt": str(receipt),
         "top3_receipt_sha256": receipt_binding.sha256,
+        "safe_resume_verified": skipped,
+        "endpoint_invariants": endpoint_invariants,
+        "selector_semantics_verified": True,
     }
 
 
@@ -2908,6 +4832,7 @@ def build_parser() -> argparse.ArgumentParser:
     worker2 = subparsers.add_parser("worker-stage2", parents=[common])
     worker2.add_argument("--top3-receipt", type=Path)
     worker2.add_argument("--process-id", required=True)
+    worker2.add_argument("--slot-index", type=int, required=True, choices=(1, 2))
     worker2.add_argument("--device", default="cuda:0")
 
     subparsers.add_parser("aggregate-stage1", parents=[common])

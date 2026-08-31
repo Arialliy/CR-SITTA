@@ -4,7 +4,7 @@ created_at: "2026-08-27"
 
 scientific_protocol:
   path: configs/binary_tent_source_calibration_v1.yaml
-  sha256: 4c9c57def0fea69ed83f88d6abc31d83988d2e7d0dace35a94c2e9defe2baf8d
+  sha256: a53d5a9f20094bb8453a0b11f45b92c0994342db1a57d51f5c2bb3f19811cb17
 
 cache_protocol:
   path: configs/binary_tent_source_calibration_cache_v1.yaml
@@ -13,7 +13,9 @@ cache_protocol:
   require_complete_sentinel: true
   verify_every_manifest_file_sha256_at_process_entry: true
   consumer_mode: read_only_numpy_mmap_with_private_image_copy
-  target_access: outer_evaluator_after_episode_return_only
+  target_access: >-
+    opaque_integrity_bytes_hashed_at_entry; target_tensor_deserialization_and_indexing
+    only_after_all_cell_episodes_complete
 
 execution:
   seed: 42
@@ -22,6 +24,7 @@ execution:
   image_size: 256
   amp_enabled: false
   device_type: cuda
+  cuda_device_order: PCI_BUS_ID
   visible_cuda_devices_per_worker: 1
   deterministic_forwards:
     algorithms_enabled: true
@@ -42,9 +45,20 @@ execution:
 launcher:
   default_physical_gpu_ids: [1, 2]
   one_live_worker_per_physical_gpu: true
+  cross_launcher_physical_gpu_lease: crash_recoverable_flock
+  physical_gpu_lease_directory: results/binary_tent/.source_calibration_physical_gpu_leases
+  child_inherits_lease_fd_for_worker_lifetime: true
+  linux_parent_death_signal: SIGTERM
+  worker_parent_pid_guard: true
   reuse_only_the_slot_whose_worker_completed: true
   failure_termination_timeout_seconds: 10
   failure_cleanup: terminate_then_timeout_kill_then_wait_every_live_worker
+  worker_stdout: devnull_launcher_emits_single_receipt
+  worker_stderr: inherited_structured_progress
+  structured_assignment_stderr_event: true
+  lease_wait_heartbeat_seconds: 30
+  stage_launcher_claim: crash_recoverable_flock_scan_run_postverify
+  child_workers_inherit_stage_launcher_claim_fd: true
   stage1:
     one_candidate_per_fresh_process: true
     maximum_parallel_workers: 2
@@ -58,6 +72,11 @@ launcher:
     each_process_runs_all_top3_sequentially: true
     episodes_per_process: 14976
     top3_receipt: stage1/aggregate/stage1_top3_receipt.json
+    deterministic_shard_paths: stage2/shards/stage2-{receipt_sha256}-slot-{1,2}
+    safe_resume_current_extended_runtime_seal_only: true
+    missing_slot_action: run
+    valid_current_seal_slot_action: skip
+    invalid_or_old_seal_or_unexpected_entry_action: fail_closed_without_delete
     verify_stage1_aggregate_before_receipt_use: true
     bind_receipt_in_process_entry_runtime_seal: true
 
@@ -77,10 +96,19 @@ runtime_seal:
   algorithm: calibration-runtime-seal-v1
   full_byte_hash_at_process_entry: true
   cache_payload_process_entry_access: opaque_byte_hash_without_numpy_load
+  target_integrity_bytes_hashed_before_adaptation: true
+  target_tensor_deserialized_or_indexed_only_after_all_cell_episodes_complete: true
   parent_pilot_artifact_manifest_complete_bound: true
   source_train_and_test_split_files_bound: true
   stage2_top3_receipt_bound_with_canonical_role: stage1_top3_receipt
   full_byte_hash_before_publish: true
+  environment_summary:
+    python: true
+    torch: true
+    compiled_cuda: true
+    compiled_cudnn: true
+    platform: true
+    worker_device_contract: true
   every_condition:
     verify_all_bound_file_identity_and_metadata: true
     rehash_small_protocol_and_code_files: true
@@ -91,6 +119,7 @@ runtime_seal:
     - run_binary_tent_source_calibration.py
     - materialize_binary_tent_source_calibration_cache.py
     - tta/binary_tent_fast_runner.py
+    - tta/binary_tent_runner.py
     - tta/binary_tent_calibration_selector.py
     - tta/binary_tent.py
     - tta/adabn_fast_runner.py
@@ -101,9 +130,26 @@ runtime_seal:
     - metrics/connected_components.py
     - metrics/target_matching.py
     - dataio/corruption_cache.py
+    - dataio/__init__.py
+    - dataio/research_dataset.py
+    - corruptions/corruption_protocol.py
+    - corruptions/__init__.py
+    - corruptions/infrared_corruptions.py
+    - metrics/__init__.py
+    - metrics/official_metric_adapter.py
+    - run_corruption_pilot.py
+    - tta/__init__.py
+    - tta/adabn.py
+    - utils/metric.py
     - model/MSHNet_NSFPN.py
     - model/NS_FPN.py
     - model/diff_cross_attns.py
+    - SFS_MSDeformAttn/ops/__init__.py
+    - SFS_MSDeformAttn/ops/functions/__init__.py
+    - SFS_MSDeformAttn/ops/functions/ms_deform_attn_func.py
+    - SFS_MSDeformAttn/ops/modules/__init__.py
+    - SFS_MSDeformAttn/ops/modules/ms_deform_attn.py
+    - .conda/lib/python3.10/site-packages/MultiScaleDeformableAttention.cpython-310-x86_64-linux-gnu.so
     - test_source.py
 
 evaluation:
@@ -111,6 +157,18 @@ evaluation:
   froc_probability_thresholds: [0.5]
   fixed_probability_threshold: 0.5
   threshold_rule: strict_greater_than
+  target_threshold_rule: strict_greater_than
+  prediction_threshold_rule: strict_greater_than
+  connectivity: 2
+  max_centroid_distance: 3.0
+  centroid_distance_eligibility_rule: strict_less_than
+  min_component_area: 1
+  target_components: connected_components_of_strictly_positive_target_mask
+  prediction_components: connected_components_after_probability_strict_greater_than_threshold
+  matching: one_to_one_minimum_total_centroid_distance_over_eligible_pairs
+  detected_targets: matched_target_components
+  total_targets: target_connected_component_count
+  false_alarm_pixels: sum_area_of_unmatched_prediction_components
   retain_only_integer_sufficient_statistics: true
   target_transition_fields_forbidden: true
   entropy_hard_gate: false
@@ -118,8 +176,11 @@ evaluation:
 
 outputs:
   root: results/binary_tent/source_calibration_v1
+  publication_work_root: results/binary_tent/.source_calibration_publication_work
   refuse_overwrite: true
-  atomic_sibling_staging: true
+  atomic_same_filesystem_cross_directory_staging: true
+  publication_lock: durable_recoverable_flock_on_o_excl_created_control_file
+  stale_publication_work_entries_do_not_block_safe_resume: true
   shard_manifest: artifact_manifest.json
   shard_complete: COMPLETE.json
   records_filename: records.jsonl

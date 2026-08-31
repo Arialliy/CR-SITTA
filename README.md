@@ -15,6 +15,20 @@ restores the complete Source state before the next image.
 > AdaBN and Binary TENT implementations are baselines and infrastructure, not
 > the final CR-SITTA algorithm.
 
+> **Protocol status:** the local benchmark uses only the existing `train` and
+> `test` ID files under `datasets/`; no validation split is created. The current
+> `best_miou` and `best_pd` checkpoints were selected by repeated fixed-test
+> evaluation, so all results anchored to them are development evidence rather
+> than an untouched-test main-paper benchmark. Under the frozen protocol, TTA
+> parameters must be calibrated once on a fixed train-side Pilot with
+> `best_miou` and then reused unchanged for `best_pd`. See
+> [results/README.md](results/README.md) and the external
+> eligibility rules in
+> [configs/artifact_eligibility_registry_v1.yaml](configs/artifact_eligibility_registry_v1.yaml).
+> Run `./.conda/bin/python scripts/validate_result_eligibility.py materialize`
+> to materialize the ignored local registry at
+> `results/artifact_eligibility_registry_v1.json`.
+
 ## Current scope
 
 | Component | Status |

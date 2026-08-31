@@ -1,0 +1,102 @@
+schema_version: 2
+protocol_id: cr-sitta-tta-train-side-calibration-pilot-v2
+protocol_path: configs/tta_train_side_calibration_pilot_v2.yaml
+created_at: "2026-08-27"
+
+scope: source_train_side_method_calibration
+no_validation_split: true
+paper_result: false
+
+data_boundary:
+  allowed_split_roles: [train, test_metadata_only]
+  create_train_core: false
+  create_source_val: false
+  open_images: false
+  open_masks: false
+  modify_existing_split_files: false
+  test_split_use: id_only_leakage_guard
+
+checkpoint_anchor:
+  role: best_miou
+  selection: test_selected
+  disclosure: >-
+    The locked best_miou checkpoint anchor was selected by repeated evaluation
+    on the fixed test split during source training. This Pilot reads only the
+    fixed test ID text for leakage guards and opens no test image or mask.
+  best_pd_policy: reuse_same_frozen_hyperparameters_without_additional_tuning
+
+selection:
+  subset_size_per_dataset: 64
+  parent_exclusion: round_02_corruption_severity_pilot_64
+  rule: exclude_round_02_corruption_severity_pilot_then_ascending_sha256_of_utf8_canonical_image_id_then_id
+  canonical_id: posix_relative_identifier_without_final_suffix
+  primary_sort_key: sha256_utf8_canonical_image_id_ascending
+  tie_break: canonical_image_id_ascending
+
+output:
+  root: configs/tta_train_side_pilot_v2
+  format: one_utf8_lf_id_per_line
+  manifest: configs/tta_train_side_pilot_v2/manifest.json
+  atomic_directory_publish: true
+  overwrite: false
+
+datasets:
+  IRSTD-1K:
+    train_split: datasets/IRSTD-1K/img_idx/train_IRSTD-1K.txt
+    train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+    train_images: 800
+    test_split: datasets/IRSTD-1K/img_idx/test_IRSTD-1K.txt
+    test_split_sha256: 8c71e474358acb84f2cbebfd1282ffea236f9cb852b7f7c04feb2fd99804c579
+    test_images: 201
+    round_02_parent_pilot:
+      protocol_sha256: 62d825a2497da671de2bb6b54d5e85e96992a670404ad07c860a8bdf4ab16c5e
+      artifact: results/corruption_pilot_fixed_split/round_02/IRSTD-1K/pilot.json
+      artifact_sha256: 627028aa4e9a903a14ac9298bcca7bcfbd6c90d7de06c9bd786a380aed7eda67
+      manifest: results/corruption_pilot_fixed_split/round_02/IRSTD-1K/artifact_manifest.json
+      manifest_sha256: 5aa55b3206be25e6f65a499ed0e13541added597dc31770546a0f26456242ca5
+      complete: results/corruption_pilot_fixed_split/round_02/IRSTD-1K/COMPLETE.json
+      complete_sha256: 845a11982c57ce9529aca9ab4ba8ddf3e7f54d15145dd0be77c75a61d1239433
+      ordered_ids_sha256: 09a27c1d085bb5816da442fbcd50998b9716d757ad9cc914d86e75d9ea0978d6
+    output_file: IRSTD-1K.txt
+    output_ordered_ids_sha256: 0ee4400c021dcfb639d813bc20582060a3fff8bb635292e48abf820ce90abb13
+    output_file_sha256: b66b914ac8a2177a127a2363245c82df29395f97dfe0745c802fd7211f3b988e
+
+  NUAA-SIRST:
+    train_split: datasets/NUAA-SIRST/img_idx/train_NUAA-SIRST.txt
+    train_split_sha256: 324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4
+    train_images: 213
+    test_split: datasets/NUAA-SIRST/img_idx/test_NUAA-SIRST.txt
+    test_split_sha256: e49023203a323c247306b314f23c8b3b917093a26984067792355adff7a8386e
+    test_images: 214
+    round_02_parent_pilot:
+      protocol_sha256: 62d825a2497da671de2bb6b54d5e85e96992a670404ad07c860a8bdf4ab16c5e
+      artifact: results/corruption_pilot_fixed_split/round_02/NUAA-SIRST/pilot.json
+      artifact_sha256: e32db90428b0e061493542ea32e6b4a99f7ea9e8a9cec3d0cb62bbe72ae929c7
+      manifest: results/corruption_pilot_fixed_split/round_02/NUAA-SIRST/artifact_manifest.json
+      manifest_sha256: be924449fc16864b29a9163acde28208afbcea35a51fe7ea9f675393c2bcc725
+      complete: results/corruption_pilot_fixed_split/round_02/NUAA-SIRST/COMPLETE.json
+      complete_sha256: a2decf1a435a46c6d12fbb83662c64ce15b49cb9cfe5f74d66db048a2bcd4117
+      ordered_ids_sha256: 97c12e4fccb20c9a8df2a3c4c5d57ba3ebd3b6bef636a51d0af3a503334ba346
+    output_file: NUAA-SIRST.txt
+    output_ordered_ids_sha256: a48e5e3f0ec3e6911a74f953e96aa7ea362b2f2f32c37626099afd61f4935baa
+    output_file_sha256: f15f46a4f095689e126391973b1a8a216ffcb8c6330e4f348defe691ee3a369f
+
+  NUDT-SIRST:
+    train_split: datasets/NUDT-SIRST/img_idx/train_NUDT-SIRST.txt
+    train_split_sha256: e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3
+    train_images: 663
+    test_split: datasets/NUDT-SIRST/img_idx/test_NUDT-SIRST.txt
+    test_split_sha256: a463c52ee64b1c803c4a322fe090aaf6bc360844898e3943bb7c64a8e551b86e
+    test_images: 664
+    round_02_parent_pilot:
+      protocol_sha256: 62d825a2497da671de2bb6b54d5e85e96992a670404ad07c860a8bdf4ab16c5e
+      artifact: results/corruption_pilot_fixed_split/round_02/NUDT-SIRST/pilot.json
+      artifact_sha256: d5bd0c896ccb993fd1dd8384352597489017c870f258a53411dba706f35390e7
+      manifest: results/corruption_pilot_fixed_split/round_02/NUDT-SIRST/artifact_manifest.json
+      manifest_sha256: 0a170c5ea61e280e3f1d6a6c477fe208ec9880bd7865503b51c1cf080659c914
+      complete: results/corruption_pilot_fixed_split/round_02/NUDT-SIRST/COMPLETE.json
+      complete_sha256: da44c220ccbfbab510f1632dd494e7c3b602be4ebebf1b7ba749d0275bc7b925
+      ordered_ids_sha256: 19cab65e6d89fd2861f00f04f985ea5e293e7b8924cd6077f1f13983379e9dfb
+    output_file: NUDT-SIRST.txt
+    output_ordered_ids_sha256: 5c6c8b441eab5277611fa1007354692df557db311e2d7969e34ebeaba3ae00e4
+    output_file_sha256: c9eebc3a23f94d0c01bd56a21c7a58475947fa53b72021d05668b1a901ded74b

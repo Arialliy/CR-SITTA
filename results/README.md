@@ -21,6 +21,32 @@ results/
 历史目录迁移记录见 `relocations.json`；已经由 SHA-256 封存的历史结果只登记
 迁移关系，不直接改写其内部 JSON。
 
+## 科学资格与数据边界
+
+官方数据入口只使用 `datasets/<dataset>/img_idx/` 中既有的 `train_*.txt`
+和 `test_*.txt`，不创建验证集，也不改变这些 ID 文件。训练侧固定 64 图的
+TTA Pilot 仅用于方法超参数校准；它不是新的数据划分、不是模型训练集缩减，
+也不是论文性能结果。该 Pilot 与 corruption severity Pilot64 及 test ID 均
+零重叠。
+
+当前 `best_miou` 和 `best_pd` Source checkpoint 均由 500 epoch 后逐 epoch
+评价固定 test 得到，因此现有 Source、corruption、AdaBN 与相关导出属于
+`development_test_selected`，不能表述为未触碰 test 的无偏论文主表结果。
+版本化资格规则见 `configs/artifact_eligibility_registry_v1.yaml`；运行
+`./.conda/bin/python scripts/validate_result_eligibility.py materialize` 后会在
+本目录生成被 Git 忽略的 `artifact_eligibility_registry_v1.json`，且不会改写
+任何已经封存的实验产物。
+
+TTA 只在训练侧 Pilot 上选择一次超参数：以 `best_miou` 为校准锚点；随后
+`best_pd` 必须复用完全相同的冻结参数，不允许再调一次。完整 CR-SITTA 冻结后，
+才允许在完整固定 test 上运行，并为两个 checkpoint 角色分别保存指标、逐图记录
+和全部预测 mask。
+
+`binary_tent/ss_calibration_cache_v2/` 是由该训练侧 Pilot64 派生的三数据集
+TENT-SS 协议/校准资产。它只把既有 test ID 用作泄漏检查，不创建 validation，
+不包含主论文性能结论；eligibility 固定为 `protocol_asset_nonperformance`、
+`main_paper_table: false`，仅供 development-only 方法校准使用。
+
 AdaBN 实现门禁使用固定训练域样本，单独写入
 `adabn/adabn_source_pilot_smoke_v1/`。该目录必须标记
 `paper_result: false` 和 `performance_metrics_computed: false`；其中的训练域

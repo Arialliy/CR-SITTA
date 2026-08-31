@@ -1,0 +1,359 @@
+schema_version: 1
+registry_id: cr-sitta-artifact-eligibility-registry-v1
+output: results/artifact_eligibility_registry_v1.json
+
+policies:
+  official_split_model: train_test_only
+  validation_split_created: false
+  main_paper_requires_no_test_selection: true
+  existing_artifacts_are_immutable: true
+
+artifacts:
+  - artifact_id: source_training_dual_test_selected_checkpoints
+    root: results/retraining_fixed_split
+    artifact_role: completed_source_training_and_checkpoint_selection
+    identity:
+      mode: full_tree
+      expected_sha256: b5f067087c50d06be01dd9576f077072a3f434e7626181fd1375a1235d17e263
+    artifact_complete: true
+    formal_protocol_complete: false
+    scientific_eligibility:
+      tier: development_test_selected
+      main_paper_table: false
+      reason_codes:
+        - source_checkpoint_test_selected
+        - formal_completion_seal_absent
+    selection:
+      source_checkpoint_role: best_miou_and_best_pd
+      checkpoint_selection_split: test
+      tta_calibration_split: none
+      test_used_for_checkpoint_selection: true
+      test_used_for_tta_selection: false
+    notes: >-
+      Both checkpoints were selected by repeated fixed-test evaluation during
+      epochs 500-1000. The files remain valid development evidence but are not
+      an unbiased final-test checkpoint source.
+
+  - artifact_id: clean_source_best_miou_standardized_export
+    root: results/baseline
+    artifact_role: clean_source_metrics_per_image_probabilities_and_masks
+    identity:
+      mode: full_tree
+      expected_sha256: 159e1a5855e4fd8c2a2423534725f50b7c6621bb85add24829b63c4a02d43a4e
+    artifact_complete: true
+    formal_protocol_complete: false
+    scientific_eligibility:
+      tier: development_test_selected
+      main_paper_table: false
+      reason_codes:
+        - source_checkpoint_test_selected
+        - best_pd_standardized_export_not_run
+        - formal_completion_seal_absent
+    selection:
+      source_checkpoint_role: best_miou
+      checkpoint_selection_split: test
+      tta_calibration_split: none
+      test_used_for_checkpoint_selection: true
+      test_used_for_tta_selection: false
+    notes: >-
+      Complete clean export for best_miou only. Existing files are not modified;
+      best_pd must be exported separately under a future frozen protocol.
+
+  - artifact_id: source_corruption_39_cell_best_miou
+    root: results/source_corruption_benchmark_fixed_split_v1
+    artifact_role: source_corruption_development_benchmark
+    identity:
+      mode: sealed_manifest_chain
+      expected_sha256: f236035145e5ff4958dd59a81a67241b37f2c2f36693c0c3726719905ca6d3b3
+      exact_tree: true
+      seals:
+        - manifest: IRSTD-1K/best_miou/artifact_manifest.json
+          manifest_sha256: 2b9b2fea0677af9678e2926fd1badd07a8645c3452f0ba41fea0d41cab793348
+          completion: IRSTD-1K/best_miou/COMPLETE.json
+          completion_sha256: a64dc325757317a271771641a80fb419e554dbf1239a3fe1eb939b98244c750c
+        - manifest: NUAA-SIRST/best_miou/artifact_manifest.json
+          manifest_sha256: 996092775172aace9fd885edc11a7941c912c6370eab5e305fd49e9731eaf0b1
+          completion: NUAA-SIRST/best_miou/COMPLETE.json
+          completion_sha256: d525959c3c38070d8ddb966d5926b82e9df4c0c706e9e3fa671e44e08a04c45b
+        - manifest: NUDT-SIRST/best_miou/artifact_manifest.json
+          manifest_sha256: 9dfaa853ccb39f6c20bc339f1281d8f2ead0de0dcef5a5882fd62fc4ec090176
+          completion: NUDT-SIRST/best_miou/COMPLETE.json
+          completion_sha256: bd8db1f59d938264d1c06e9e9f13811bd132e290449bb6bade5319bc890be65c
+    artifact_complete: true
+    formal_protocol_complete: true
+    scientific_eligibility:
+      tier: development_test_selected
+      main_paper_table: false
+      reason_codes:
+        - source_checkpoint_test_selected
+        - best_pd_checkpoint_axis_not_run
+    selection:
+      source_checkpoint_role: best_miou
+      checkpoint_selection_split: test
+      tta_calibration_split: none
+      test_used_for_checkpoint_selection: true
+      test_used_for_tta_selection: false
+    notes: Complete 3-dataset x 13-condition Source benchmark.
+
+  - artifact_id: adabn_batch_stats_39_cell_best_miou
+    root: results/adabn/adabn_batch_stats_v1
+    artifact_role: normalization_foreground_expansion_failure_control
+    identity:
+      mode: sealed_manifest_chain
+      expected_sha256: b44686af1e72f985ca715611c3ef9f084bbc83f244e17a7833e92a3fee44b2d5
+      exact_tree: true
+      seals:
+        - manifest: global_index/artifact_manifest.json
+          manifest_sha256: c478fd505c4cb8bc568e308fca09f04cc4a992e48d9b43ee07d5170b692a1d83
+          completion: COMPLETE.json
+          completion_sha256: a5b86ca406b510c3a1ced594b09ab6972e05f9246c9c0b643b3593da4bed81a2
+    artifact_complete: true
+    formal_protocol_complete: true
+    scientific_eligibility:
+      tier: development_test_selected
+      main_paper_table: false
+      reason_codes:
+        - source_checkpoint_test_selected
+        - best_pd_checkpoint_axis_not_run
+    selection:
+      source_checkpoint_role: best_miou
+      checkpoint_selection_split: test
+      tta_calibration_split: none
+      test_used_for_checkpoint_selection: true
+      test_used_for_tta_selection: false
+    notes: >-
+      Complete development artifact. Its scientific role is a normalization
+      failure control, not evidence that AdaBN improves detection.
+
+  - artifact_id: binary_tent_source_implementation_smoke
+    root: results/binary_tent/source_implementation_smoke_v1
+    artifact_role: implementation_smoke_nonpaper
+    identity:
+      mode: sealed_manifest_chain
+      expected_sha256: 69f8b3d6f98ee964873bb21d96ec52b9b51c0c0efda1f6ac967c3fa1feb17bac
+      exact_tree: true
+      seals:
+        - manifest: artifact_manifest.json
+          manifest_sha256: 6a4333d6fadd2c19cff8e04d76368c408e3dfb3e890764f3e431616c864fc0d3
+          completion: COMPLETE.json
+          completion_sha256: 90076917524486f78aec1f72bcdf2ae20d1d611ab8ebf894feb8c2f19a441480
+    artifact_complete: true
+    formal_protocol_complete: false
+    scientific_eligibility:
+      tier: engineering_smoke
+      main_paper_table: false
+      reason_codes:
+        - source_train_implementation_smoke
+        - provisional_optimizer_not_selected
+    selection:
+      source_checkpoint_role: best_miou
+      checkpoint_selection_split: test
+      tta_calibration_split: train
+      test_used_for_checkpoint_selection: true
+      test_used_for_tta_selection: false
+    notes: No formal Binary TENT performance claim is permitted from this run.
+
+  - artifact_id: binary_tent_cross_process_repro_candidate
+    root: results/binary_tent/cross_process_repro_candidate_v1
+    artifact_role: reproducibility_candidate_nonpaper
+    identity:
+      mode: sealed_manifest_chain
+      expected_sha256: 2e391d03b8320e774f59c5fd88c6ababaad54ac13c079ad60abdc1391bc6a6dd
+      exact_tree: true
+      seals:
+        - manifest: artifact_manifest.json
+          manifest_sha256: a8168b04d9f3e0e66b444fdc1fe7571a11df625917f59068a17c729af4d52d9b
+          completion: COMPLETE.json
+          completion_sha256: 781ca7016112b613049fa70bdde17111483cba1aed45e1d047b4ddd69b7f07cb
+    artifact_complete: true
+    formal_protocol_complete: false
+    scientific_eligibility:
+      tier: engineering_smoke
+      main_paper_table: false
+      reason_codes:
+        - source_train_reproducibility_candidate
+        - probability_tolerance_not_frozen
+    selection:
+      source_checkpoint_role: best_miou
+      checkpoint_selection_split: test
+      tta_calibration_split: train
+      test_used_for_checkpoint_selection: true
+      test_used_for_tta_selection: false
+    notes: Binary masks and integer metrics reproduce; tolerance remains a candidate.
+
+  - artifact_id: corruption_severity_round_02
+    root: results/corruption_pilot_fixed_split/round_02
+    artifact_role: frozen_corruption_protocol_asset
+    identity:
+      mode: sealed_manifest_chain
+      expected_sha256: 8656f7bd97b67a859d99376622825d85fbb063231d42f88a12db3529f5265486
+      exact_tree: true
+      seals:
+        - manifest: IRSTD-1K/artifact_manifest.json
+          manifest_sha256: 5aa55b3206be25e6f65a499ed0e13541added597dc31770546a0f26456242ca5
+          completion: IRSTD-1K/COMPLETE.json
+          completion_sha256: 845a11982c57ce9529aca9ab4ba8ddf3e7f54d15145dd0be77c75a61d1239433
+        - manifest: NUAA-SIRST/artifact_manifest.json
+          manifest_sha256: be924449fc16864b29a9163acde28208afbcea35a51fe7ea9f675393c2bcc725
+          completion: NUAA-SIRST/COMPLETE.json
+          completion_sha256: a2decf1a435a46c6d12fbb83662c64ce15b49cb9cfe5f74d66db048a2bcd4117
+        - manifest: NUDT-SIRST/artifact_manifest.json
+          manifest_sha256: 0a170c5ea61e280e3f1d6a6c477fe208ec9880bd7865503b51c1cf080659c914
+          completion: NUDT-SIRST/COMPLETE.json
+          completion_sha256: da44c220ccbfbab510f1632dd494e7c3b602be4ebebf1b7ba749d0275bc7b925
+      supplemental_files:
+        - path: calibration_report.json
+          sha256: 26e9de24f400a40e36ae461f56bba3a3edab23f6565c32a0dc1a12f17e85951b
+          size_bytes: 20797
+    artifact_complete: true
+    formal_protocol_complete: true
+    scientific_eligibility:
+      tier: protocol_asset_nonperformance
+      main_paper_table: false
+      reason_codes:
+        - nonperformance_protocol_asset
+    selection:
+      source_checkpoint_role: best_miou
+      checkpoint_selection_split: test
+      tta_calibration_split: train
+      test_used_for_checkpoint_selection: true
+      test_used_for_tta_selection: false
+    notes: Frozen severity design asset; it is not a method-performance result.
+
+  - artifact_id: full_test_corruption_cache_v1
+    root: results/corruption_cache_fixed_split_v1
+    artifact_role: frozen_full_test_input_cache_nonperformance
+    identity:
+      mode: sealed_manifest_chain
+      expected_sha256: 2cfa6ce125ced2a3068e682e6c87dc5e4bf924afafd0a7a112d83ddad221f2f6
+      exact_tree: true
+      seals:
+        - manifest: IRSTD-1K/manifest.json
+          manifest_sha256: 84bb406c1b2fdd334026e1a885cd7eacf60de4c43f333fd7fb8f15aacbb12e88
+          completion: IRSTD-1K/COMPLETE.json
+          completion_sha256: f208ac8e22ce2763e64dee73155caf430fe29b8a459afc2faf8def06bd4f7b0c
+        - manifest: NUAA-SIRST/manifest.json
+          manifest_sha256: 42444b0b82a093f321c27ed221150fa575e075dff82209271874d5ea6725aa00
+          completion: NUAA-SIRST/COMPLETE.json
+          completion_sha256: cf4942b9f4b671558110dcdc1eff876c578f3b3f84f10805683fd7fcf7fe0626
+        - manifest: NUDT-SIRST/manifest.json
+          manifest_sha256: 51acd004161c6e3949a8ff1368448e399ba655ccc154aa819864f81676032788
+          completion: NUDT-SIRST/COMPLETE.json
+          completion_sha256: 60243dc10fd96b6d69bdb1c756e3a90fc70004c7900d1d58643f406d5f72ea63
+    artifact_complete: true
+    formal_protocol_complete: true
+    scientific_eligibility:
+      tier: protocol_asset_nonperformance
+      main_paper_table: false
+      reason_codes:
+        - nonperformance_input_cache
+    selection:
+      source_checkpoint_role: best_miou
+      checkpoint_selection_split: test
+      tta_calibration_split: none
+      test_used_for_checkpoint_selection: true
+      test_used_for_tta_selection: false
+    notes: Cache completeness does not constitute a method result.
+
+  - artifact_id: binary_tent_source_calibration_cache_v1
+    root: results/binary_tent/source_calibration_cache_v1
+    artifact_role: superseded_same_pilot_train_input_cache_nonperformance
+    identity:
+      mode: sealed_manifest_chain
+      expected_sha256: 67ce41c6eb27c8d6cde9cffe79a4f8492730c3b5094e041aabc0b9f08b1bc20d
+      exact_tree: true
+      seals:
+        - manifest: IRSTD-1K/manifest.json
+          manifest_sha256: 523fe5bf49f200e8cdfd786d890341171ff0a59337d24242e4c6de0f6edced46
+          completion: IRSTD-1K/COMPLETE.json
+          completion_sha256: 1c93c7bf3b2536b22c288ca9d30de33602dac183321e5a43196b475efeadb8cd
+          linked_manifests:
+            - path: IRSTD-1K/method_input_manifest.json
+              sha256: 1bcd4dc27769543fcf5812cdc1020347035a3ae1cdfc2b4f724ef1190e027e87
+              completion_hash_field: method_input_manifest_sha256
+        - manifest: NUAA-SIRST/manifest.json
+          manifest_sha256: 32e301e81a63b075b4a54c89ecc7d80a24913d182ad1d7c419ffc511cac7f61c
+          completion: NUAA-SIRST/COMPLETE.json
+          completion_sha256: 4ffabe38de76ff17a8233f155c0890f93fd90b75f267100bc1d613be812eb534
+          linked_manifests:
+            - path: NUAA-SIRST/method_input_manifest.json
+              sha256: ff0f8a69aa7c74c655f9deef97412a3b9cd03f54535d5248f431107277d796ae
+              completion_hash_field: method_input_manifest_sha256
+        - manifest: NUDT-SIRST/manifest.json
+          manifest_sha256: 935c0b28390ca29b3202466967516074467aee147a33cdc7ce107452c357e934
+          completion: NUDT-SIRST/COMPLETE.json
+          completion_sha256: 8a20b39ae6d9385c061322dc096ed95312e31423ec8837352bba14202365d68b
+          linked_manifests:
+            - path: NUDT-SIRST/method_input_manifest.json
+              sha256: 614ab8e800fe2806520206846bdf52215dd7635376b6316ef18fe4857ad363ba
+              completion_hash_field: method_input_manifest_sha256
+    artifact_complete: true
+    formal_protocol_complete: true
+    scientific_eligibility:
+      tier: protocol_asset_nonperformance
+      main_paper_table: false
+      reason_codes:
+        - nonperformance_input_cache
+        - same_images_reused_from_severity_pilot
+        - superseded_by_disjoint_train_side_pilot_v2
+    selection:
+      source_checkpoint_role: best_miou
+      checkpoint_selection_split: test
+      tta_calibration_split: train
+      test_used_for_checkpoint_selection: true
+      test_used_for_tta_selection: false
+    notes: >-
+      Valid immutable cache, but it reuses the severity Pilot64 and will not be
+      used for the revised train-side TENT-SS selection protocol.
+
+  - artifact_id: binary_tent_ss_calibration_cache_v2
+    root: results/binary_tent/ss_calibration_cache_v2
+    artifact_role: train_side_protocol_calibration_asset_nonperformance
+    identity:
+      mode: sealed_manifest_chain
+      expected_sha256: 78e593fad2385cb1c394c44d5c438add75b10f878f0d902862b88e13084a8526
+      exact_tree: true
+      seals:
+        - manifest: IRSTD-1K/manifest.json
+          manifest_sha256: 95d0ee45ccf2f221eea042f96c3bfd3e25dcc736286482ad21f2591176651db6
+          completion: IRSTD-1K/COMPLETE.json
+          completion_sha256: d558459dc6387e45eb0ce64e2e3a9ae773613570f9871b3b9abe97d85121e0f8
+          linked_manifests:
+            - path: IRSTD-1K/method_input_manifest.json
+              sha256: 2144bc9f0e05e38d81c73c0b4a7fa85784c5836f88ea54ddd727e447e7689072
+              completion_hash_field: method_input_manifest_sha256
+        - manifest: NUAA-SIRST/manifest.json
+          manifest_sha256: aef94b27929a80cf8b05174862cc688d844a9016867cbee0c9751f105229a76d
+          completion: NUAA-SIRST/COMPLETE.json
+          completion_sha256: 171ac30c25ad5a5c8039b7edf82b584c1a180845503c35f85f0175ba58c673f1
+          linked_manifests:
+            - path: NUAA-SIRST/method_input_manifest.json
+              sha256: 5099ea261f977bfabac73283f3b4c6585a50cdab1092a6cce7f31ef31c3adcaa
+              completion_hash_field: method_input_manifest_sha256
+        - manifest: NUDT-SIRST/manifest.json
+          manifest_sha256: bc9ac2caee9647365f58cf21fea30558295889adbb68b8c560779bcc73959e25
+          completion: NUDT-SIRST/COMPLETE.json
+          completion_sha256: 835c873f9d575b31e0947aecb9f8cfa2fc020832c0ab0317db7657e4ec484125
+          linked_manifests:
+            - path: NUDT-SIRST/method_input_manifest.json
+              sha256: 02b281fa8ed08906f6b4eab2525b86fc9c45c060d162e9c479cb61dac04f1b8d
+              completion_hash_field: method_input_manifest_sha256
+    artifact_complete: true
+    formal_protocol_complete: true
+    scientific_eligibility:
+      tier: protocol_asset_nonperformance
+      main_paper_table: false
+      reason_codes:
+        - nonperformance_train_side_calibration_asset
+        - development_only_method_calibration_input
+    selection:
+      source_checkpoint_role: none
+      checkpoint_selection_split: none
+      tta_calibration_split: train
+      test_used_for_checkpoint_selection: false
+      test_used_for_tta_selection: false
+    notes: >-
+      Complete three-dataset cache derived from the frozen train-side Pilot64.
+      It uses test IDs only as a leakage guard, creates no validation split,
+      and is a development-only calibration input rather than a main-paper
+      performance result.

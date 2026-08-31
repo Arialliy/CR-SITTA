@@ -1,0 +1,111 @@
+schema_version: 2
+protocol_id: cr-sitta-binary-tent-ss-calibration-cache-v2
+protocol_path: configs/binary_tent_ss_calibration_cache_v2.yaml
+created_at: "2026-08-27"
+
+scope: source_train_side_method_calibration_cache
+paper_result: false
+no_validation_split: true
+adaptation_interface_invoked: false
+method_receives_labels: false
+test_split_use: id_only_leakage_guard
+
+lineage:
+  train_side_pilot_protocol:
+    path: configs/tta_train_side_calibration_pilot_v2.yaml
+    sha256: 3a35f2107786815ef8e7b053e1c220406f9bf2d095f59bccdc5822e16be9ab96
+  train_side_pilot_manifest:
+    path: configs/tta_train_side_pilot_v2/manifest.json
+    sha256: 99b1ee706fc57813b473039513566566ba2e6a065663be122c260edf9ef6dfb1
+  frozen_severity_table:
+    path: corruptions/severity_tables.yaml
+    sha256: c3218738fd32f2cfa2a24731456d9dc18fa648eb7b0b6e1fbd5175c605ba0536
+  pixel_pipeline:
+    corruption_protocol:
+      path: corruptions/corruption_protocol.py
+      sha256: af466bb7fa13eea1758f68b038bef2f82b02dff67f4371a2eff099acce1bcc12
+    corruption_implementation:
+      path: corruptions/infrared_corruptions.py
+      sha256: 616f250c286abaa56054bc03d2af6096507ca2202e7597cdb3984dd933d5d1f6
+    research_dataset_reference:
+      path: dataio/research_dataset.py
+      sha256: f6fd667d944ade5be6fefa8cb4ec2099d3ecf177caa65372ebca04e2f9abf915
+  runtime_metadata_seal:
+    materializer:
+      path: materialize_binary_tent_ss_calibration_cache_v2.py
+      sha256: 5ba2f97289da183ed952ade467833bc0188d5ed8468efceb5667a7dd43450645
+    train_side_pilot_protocol_implementation:
+      path: dataio/train_side_pilot_protocol.py
+      sha256: 33b9b1d63152d325e7bab2d30af25121ca215ef1d6af5c1a0c87ffbbac792a5f
+
+input_protocol:
+  subset_size_per_dataset: 64
+  seed: 42
+  ordered_conditions:
+    - [clean, 0]
+    - [gaussian_noise, 1]
+    - [gaussian_noise, 3]
+    - [gaussian_noise, 5]
+    - [gaussian_blur, 1]
+    - [gaussian_blur, 3]
+    - [gaussian_blur, 5]
+    - [low_contrast, 1]
+    - [low_contrast, 3]
+    - [low_contrast, 5]
+    - [stripe_noise, 1]
+    - [stripe_noise, 3]
+    - [stripe_noise, 5]
+
+preprocessing:
+  image_color_space: RGB
+  image_resize: {size: [256, 256], interpolation: bilinear}
+  mask_resize: {size: [256, 256], interpolation: nearest}
+  image_range_before_corruption: [0.0, 1.0]
+  normalization:
+    name: ImageNet
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+    order: after_corruption
+  mask_corrupted: false
+
+cache:
+  root: results/binary_tent/ss_calibration_cache_v2
+  format: nsfpn-binary-tent-ss-calibration-cache-v2
+  atomic_no_replace: true
+  overwrite: false
+  stale_staging_recovery_requires_explicit_flag: true
+  image_dtype: little_endian_float32
+  image_shape: [64, 3, 256, 256]
+  targets_path: outer_evaluator/targets.npy
+  targets_role: outer_evaluator_only
+  method_facing_targets: forbidden
+  method_facing_fields: [image, image_id, original_size, dataset, corruption, severity, seed]
+
+datasets:
+  IRSTD-1K:
+    root: datasets/IRSTD-1K
+    train_split: datasets/IRSTD-1K/img_idx/train_IRSTD-1K.txt
+    train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+    test_split: datasets/IRSTD-1K/img_idx/test_IRSTD-1K.txt
+    test_split_sha256: 8c71e474358acb84f2cbebfd1282ffea236f9cb852b7f7c04feb2fd99804c579
+    calibration_ids: configs/tta_train_side_pilot_v2/IRSTD-1K.txt
+    calibration_ids_file_sha256: b66b914ac8a2177a127a2363245c82df29395f97dfe0745c802fd7211f3b988e
+    calibration_ordered_ids_sha256: 0ee4400c021dcfb639d813bc20582060a3fff8bb635292e48abf820ce90abb13
+  NUAA-SIRST:
+    root: datasets/NUAA-SIRST
+    train_split: datasets/NUAA-SIRST/img_idx/train_NUAA-SIRST.txt
+    train_split_sha256: 324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4
+    test_split: datasets/NUAA-SIRST/img_idx/test_NUAA-SIRST.txt
+    test_split_sha256: e49023203a323c247306b314f23c8b3b917093a26984067792355adff7a8386e
+    calibration_ids: configs/tta_train_side_pilot_v2/NUAA-SIRST.txt
+    calibration_ids_file_sha256: f15f46a4f095689e126391973b1a8a216ffcb8c6330e4f348defe691ee3a369f
+    calibration_ordered_ids_sha256: a48e5e3f0ec3e6911a74f953e96aa7ea362b2f2f32c37626099afd61f4935baa
+  NUDT-SIRST:
+    root: datasets/NUDT-SIRST
+    train_split: datasets/NUDT-SIRST/img_idx/train_NUDT-SIRST.txt
+    train_split_sha256: e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3
+    test_split: datasets/NUDT-SIRST/img_idx/test_NUDT-SIRST.txt
+    test_split_sha256: a463c52ee64b1c803c4a322fe090aaf6bc360844898e3943bb7c64a8e551b86e
+    calibration_ids: configs/tta_train_side_pilot_v2/NUDT-SIRST.txt
+    calibration_ids_file_sha256: c9eebc3a23f94d0c01bd56a21c7a58475947fa53b72021d05668b1a901ded74b
+    calibration_ordered_ids_sha256: 5c6c8b441eab5277611fa1007354692df557db311e2d7969e34ebeaba3ae00e4
