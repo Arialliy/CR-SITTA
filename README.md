@@ -36,8 +36,16 @@ restores the complete Source state before the next image.
 | Frozen protocol, upstream Source reproduction, unified evaluator, and deterministic corruptions | Completed and archived in [CR_SITTA_STEPS_0_3.md](CR_SITTA_STEPS_0_3.md) |
 | Fixed-split NS-FPN training and clean/13-condition Source benchmark on IRSTD-1K, NUAA-SIRST, and NUDT-SIRST | Implemented |
 | Single-image episodic state/reset framework and AdaBN | Implemented, including the formal 3-dataset × 13-condition runner |
-| Binary Episodic TENT | Smoke testing, cross-process audit, transition metrics, and train-derived calibration tooling are present; optimizer/LR calibration is in progress |
+| Binary Episodic TENT | Stage 1 engineering protocol completed, but the scientific utility gate failed; Stage 2/3 are hard-blocked, TENT-SS is retained as a negative baseline, and the source-train-only D0 diagnostic runner is implemented but has not yet published formal GPU results |
 | Full CR-SITTA | Not implemented yet |
+
+The untouched historical v2 runner is preserved only as a non-authorizing
+[negative-result code supplement](scripts/archive_binary_tent_ss_v2_runner_source.py),
+whose ignored local artifact can be verified as documented in
+[results/README.md](results/README.md).
+The active v2 CLI permanently blocks every Stage-2 role before GPU or output
+side effects; only a future candidate passing the reviewed v3 scientific gate
+can use a separate Stage-2 authorization path.
 
 The fixed benchmark contains clean data plus Gaussian noise, Gaussian blur,
 low contrast, and stripe noise at S1, S3, and S5. Corruptions are applied
@@ -147,7 +155,8 @@ The following example runs IRSTD-1K. Replace the dataset name with
 
 These are full formal runs rather than quick smoke tests. Inspect an entry
 point with `--help` before launching it. Binary TENT is intentionally excluded
-from the quick-start path while calibration remains unfinished.
+from the quick-start path because v2 failed the scientific gate and its
+Stage 2/3 entrypoints are permanently blocked.
 
 ## Upstream and third-party attribution
 

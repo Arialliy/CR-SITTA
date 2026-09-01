@@ -403,16 +403,17 @@ def test_worker_stage1_fails_before_contract_without_inherited_lease(monkeypatch
         runner.run_stage1_worker(args)
 
 
-def test_worker_stage2_fails_before_contract_without_inherited_lease(monkeypatch) -> None:
+def test_worker_stage2_is_permanently_blocked_before_lease_or_contract(monkeypatch) -> None:
+    calls: list[str] = []
     monkeypatch.setattr(
         runner.core,
         "_verify_inherited_gpu_lease",
-        lambda required: (_ for _ in ()).throw(runner.CalibrationExecutionError("no lease")),
+        lambda required: calls.append("lease"),
     )
     monkeypatch.setattr(
         runner,
         "load_contract",
-        lambda *a, **k: (_ for _ in ()).throw(AssertionError("lease bypass")),
+        lambda *a, **k: calls.append("contract"),
     )
     args = argparse.Namespace(
         execution_config=EXECUTION,
@@ -421,8 +422,11 @@ def test_worker_stage2_fails_before_contract_without_inherited_lease(monkeypatch
         slot_index=1,
         device="cuda:0",
     )
-    with pytest.raises(runner.CalibrationExecutionError, match="no lease"):
+    with pytest.raises(
+        runner.LegacyV2Stage2BlockedError, match="permanently blocked"
+    ):
         runner.run_stage2_worker(args)
+    assert calls == []
 
 
 def test_execute_candidate_source_has_no_bn_protocol_loop() -> None:

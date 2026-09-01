@@ -1,0 +1,191 @@
+schema_version: 1
+protocol_id: cr-sitta-tent-failure-diagnostics-v1
+created_at: "2026-09-01"
+
+scope:
+  phase: D0_existing_result_diagnosis
+  source_train_derived: true
+  paper_result: false
+  paper_test_result: false
+  oracle_analysis: true
+  no_validation_split: true
+  allowed_split_roles: [train, test_metadata_only_for_leakage_guard]
+  use_test_images: false
+  use_test_labels: false
+  method_label_accesses: 0
+  disclosure: >-
+    This is an outer-oracle diagnosis of the frozen Binary TENT Stage-1
+    negative result. Images and masks come only from the frozen 64-image
+    source-train cache. Train masks are unavailable to the method and are
+    deserialized only after every selected label-free episode in a cell has
+    completed. This artifact is not a paper test result and cannot select or
+    authorize a Stage-2 candidate.
+
+cache:
+  root: results/binary_tent/ss_calibration_cache_v2
+  protocol_path: configs/binary_tent_ss_calibration_cache_v2.yaml
+  protocol_sha256: e225311cce252125eaf3a2b47eeeea4cde60d0363c8c71f48494d70e41c2aa3e
+  subset_size_per_dataset: 64
+  condition_count: 13
+  target_path: outer_evaluator/targets.npy
+  target_role: outer_evaluator_only_after_cell_label_free_completion
+
+datasets:
+  IRSTD-1K:
+    train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+    checkpoint:
+      role: best_miou
+      path: results/retraining_fixed_split/IRSTD-1K/best_miou.pth.tar
+      sha256: ee8d5c3af67d7c93ff6be25b169bd8fd59afcd776afd173b4e230ad8dc8aa8b2
+  NUAA-SIRST:
+    train_split_sha256: 324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4
+    checkpoint:
+      role: best_miou
+      path: results/retraining_fixed_split/NUAA-SIRST/best_miou.pth.tar
+      sha256: 23feea50a847cdfc9874fe67d338a3884d9afa75d7a27b9b71a62ff2d00379cf
+  NUDT-SIRST:
+    train_split_sha256: e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3
+    checkpoint:
+      role: best_miou
+      path: results/retraining_fixed_split/NUDT-SIRST/best_miou.pth.tar
+      sha256: a67d3a7e2597d201e1fecf32b7f218aefa8274ad0443d2726197d84f44d1343e
+
+conditions:
+  - clean_S0
+  - gaussian_noise_S1
+  - gaussian_noise_S3
+  - gaussian_noise_S5
+  - gaussian_blur_S1
+  - gaussian_blur_S3
+  - gaussian_blur_S5
+  - low_contrast_S1
+  - low_contrast_S3
+  - low_contrast_S5
+  - stripe_noise_S1
+  - stripe_noise_S3
+  - stripe_noise_S5
+
+method:
+  name: Binary Episodic TENT
+  bn_protocol: source_running_statistics
+  adaptable_parameters: all_batchnorm2d_affine
+  optimizer_steps_per_image: 1
+  entropy_backward_passes_per_image: 1
+  gradient_reuse: one_backward_cloned_to_each_fresh_empty_optimizer_with_bit_exact_parameter_reset
+  entropy_eps: 1.0e-6
+  determinism:
+    policy: strict_forwards_temporary_backward_disable
+    strict_forward:
+      deterministic_algorithms_enabled: true
+      warn_only: false
+      cudnn_deterministic: true
+      cudnn_benchmark: false
+    temporary_backward_disable_scopes:
+      - entropy_backward
+      - supervised_task_backward
+    restore_strict_policy_before_optimizer_step: true
+    restore_strict_policy_before_post_forward: true
+    restore_strict_policy_after_backward_exception: true
+  candidates:
+    - {optimizer: Adam, learning_rate: 1.0e-5}
+    - {optimizer: Adam, learning_rate: 3.0e-5}
+    - {optimizer: Adam, learning_rate: 1.0e-4}
+    - {optimizer: Adam, learning_rate: 3.0e-4}
+    - {optimizer: Adam, learning_rate: 1.0e-3}
+    - {optimizer: SGD, learning_rate: 1.0e-5}
+    - {optimizer: SGD, learning_rate: 3.0e-5}
+    - {optimizer: SGD, learning_rate: 1.0e-4}
+    - {optimizer: SGD, learning_rate: 3.0e-4}
+    - {optimizer: SGD, learning_rate: 1.0e-3}
+
+source_task_gradient:
+  contract: post_warm_SLSIoU_on_source_eval_graph
+  implementation: model.loss.SLSIoULoss
+  loss_reference: train_fixed_split.py::train_one_epoch
+  human_epoch: 1000
+  epoch_index: 999
+  warm_epochs: 5
+  warm_flag: false
+  expected_auxiliary_count: 0
+  output: output_0_x_d0
+  with_shape: true
+  loss_terms: 1
+  averaging_denominator: 1
+  model_runtime: source_eval
+  bn_protocol_during_diagnostic: source_running_statistics
+  full_source_training_runtime_exact: false
+  role: outer_oracle_train_labels_only
+  adaptation_gradient_uses_labels: false
+
+evaluation:
+  probability_transform: sigmoid_once
+  prediction_threshold: 0.5
+  threshold_rule: strict_greater_than
+  near_threshold_interval: [0.45, 0.55]
+  connectivity: 2
+  max_centroid_distance: 3.0
+  min_component_area: 1
+  no_op_null_floors:
+    policy: exact_bitwise_zero
+    scope: D0_existing_result_diagnosis_only
+    is_future_v3_activity_margin: false
+    parameter: 0.0
+    logit: 0.0
+    probability: 0.0
+  optimizer_geometry:
+    runtime_hard_gate_reference: pytorch_2_1_2_single_tensor_same_device_native_dtype_bit_exact_after_v1
+    cross_backend_cpu_storage_replay_reference: pytorch_2_1_2_cpu_snapshot_native_dtype_cross_backend_storage_replay_diagnostic_v1
+    continuous_ideal_reference: continuous_float64_empty_state_first_step_v1
+    small_gradient_threshold: 1.0e-8
+    adam_near_sign_step_threshold: 0.9
+    verification_rtol: 1.0e-5
+    verification_atol: 1.0e-7
+  alignment:
+    first_order_zero_tolerance: 0.0
+
+equivalence:
+  role: shared_gradient_vs_frozen_v2_independent_candidate_execution
+  samples:
+    IRSTD-1K: {condition: clean_S0, image_index: 0, image_id: XDU102}
+    NUAA-SIRST: {condition: clean_S0, image_index: 0, image_id: Misc_421}
+    NUDT-SIRST: {condition: clean_S0, image_index: 0, image_id: "000891"}
+  candidate_scope: all_10_frozen_candidates
+  pre_logits: bit_exact
+  post_logits: bit_exact
+  entropy_gradient_bundle_sha256: exact_equal
+  parameter_delta_bundle_sha256: exact_equal
+  changed_parameter_tensor_count: exact_equal
+  step_norm_abs_tolerance: 1.0e-12
+  historical_reset: bit_exact_source
+  fresh_process_repetitions: 3
+  fresh_process_identity: linux_pid_and_proc_start_time_ticks
+  cross_process_pair_count: 3
+  method_label_accesses: 0
+  outer_evaluator_label_accesses: 0
+  target_payload_deserialized: false
+  test_images_opened: 0
+  test_labels_opened: 0
+
+output:
+  root: results/cr_sitta/tent_failure_diagnostics_v1
+  canonical_shards: shards
+  smoke_shards: smoke
+  equivalence: equivalence
+  aggregate: aggregate
+  refuse_overwrite: true
+  atomic_publish: true
+  raw_logits_written: false
+  raw_parameters_written: false
+  raw_gradients_written: false
+  per_tensor_parameter_diagnostics:
+    formal: omitted_after_global_and_semantic_group_aggregation
+    smoke: retained
+
+comparison:
+  frozen_v2_negative_archive: results/binary_tent/ss_calibration_v2_negative_archive
+  archive_source_inventory_sha256: bf8954dd2692f23e6b65761e4337f1daa77a64439386b05c6bb8df716800dfbf
+  archive_file_count: 113
+  stage1_records: stage1/aggregate/stage1_records.jsonl
+  stage1_records_sha256: ee6a21b29ceee32fa6f9f70c6509436971133f81e815596fd148716807bbe3d3
+  direct_equality_required_only_for_full_64_image_cells: true
+  smoke_comparison_role: contextual_full_cell_reference_not_direct_equality

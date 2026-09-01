@@ -1,0 +1,135 @@
+schema_version: 3
+protocol_id: cr-sitta-binary-tent-ss-calibration-v3
+created_at: "2026-09-01"
+
+scope:
+  stage: stage1_scientific_gate_replay_and_future_preregistration
+  paper_result: false
+  source_train_derived: true
+  independent_validation: false
+  use_test_images: false
+  use_test_labels: false
+  method_receives_labels: false
+  selection_bn_protocol: source_running_statistics
+  disclosure: >-
+    This v3 configuration separates protocol validity from scientific
+    eligibility. The active profile only replays the already completed v2
+    Stage 1 as a retrospective negative-result certificate and can never
+    authorize Stage 2.
+
+v2_execution_protocol_frozen_unchanged:
+  config_path: configs/binary_tent_ss_calibration_v2.yaml
+  config_sha256: f902ed555a84ca4dbf9d62511afe08764bff074e98c5bfb1c302b93a1e403090
+  selector_path: tta/binary_tent_ss_calibration_selector_v2.py
+  selector_sha256: 609cbb8582ad7c497075e95d2896675268678d6f73cb4ebec4441911e6a3ca4e
+  modify_v2_files: false
+
+selector_v3:
+  path: tta/binary_tent_ss_calibration_selector_v3.py
+  sha256: d09faf1abc1920b22c4740d4123ba944fe06632111af498c59529bbfdeb590ec
+  protocol_id: cr-sitta-binary-tent-ss-calibration-selector-v3
+  pure_cpu: true
+  exact_rational_arithmetic_from_integer_counts: true
+  filter_before_ranking: true
+  top_k_after_filter: 3
+  allow_fewer_than_top_k: true
+
+receipt_contract:
+  filename: stage1_ss_scientific_selection_receipt.json
+  schema_version: 3
+  receipt_type: stage1_ss_scientific_selection
+  no_eligible_candidate_is_normal_exit: true
+  no_eligible_candidate_exit_code: 0
+  required_authorization_fields:
+    - protocol_status
+    - scientific_status
+    - stage2_allowed
+    - formal_fully_frozen_gate
+    - unresolved_gate_thresholds
+    - retrospective_negative_replay
+    - eligible_candidates
+    - selected_for_stage2
+
+# This is the sole Stage-2 trust-chain entrypoint.  The launcher pins this
+# configuration's byte digest in reviewed source.  The current experiment has
+# no preregistered formal aggregate, so authorization must remain fail-closed.
+stage2_authorization:
+  schema_version: 1
+  contract_id: cr-sitta-stage1-formal-gate-artifact-v1
+  status: blocked_unresolved_formal_gate
+  aggregate_manifest: null
+
+active_profile:
+  id: current-v2-stage1-negative-replay-only
+  mode: retrospective_negative_replay
+  purpose: retrospective_necessary_condition_failure_certificate
+  formal_fully_frozen_gate: false
+  unresolved_gate_thresholds: true
+  retrospective_negative_replay: true
+  stage2_authorization: false
+  necessary_condition:
+    metric: macro_global_iou_delta
+    rule: strict_greater_than_zero
+    exact_fraction_required: true
+  evidence:
+    records_path: results/binary_tent/ss_calibration_v2/stage1/aggregate/stage1_records.jsonl
+    records_sha256: ee6a21b29ceee32fa6f9f70c6509436971133f81e815596fd148716807bbe3d3
+    expected_cell_records: 390
+    expected_episodes: 24960
+  expected_decision:
+    protocol_status: passed
+    scientific_status: failed
+    stage2_allowed: false
+    eligible_candidates: []
+    selected_for_stage2: []
+
+formal_future_profile:
+  status: blocked_until_all_thresholds_are_frozen
+  mode: formal_fully_frozen_gate
+  formal_fully_frozen_gate: false
+  unresolved_gate_thresholds: true
+  retrospective_negative_replay: false
+  stage2_authorization: false
+  primary_metric:
+    name: macro_global_iou_delta
+    rule: strict_greater_than_zero
+  positive_coverage:
+    minimum_cells: null
+    minimum_corruption_families: null
+    minimum_datasets: null
+  clean_safety:
+    clean_iou_equivalence_margin: null
+  operating_point_safety:
+    max_pd_drop: null
+    max_fa_increase_per_million_pixels: null
+    joint_failure_rule: pd_drop_exceeds_margin_and_fa_increase_exceeds_margin
+  activity:
+    minimum_parameter_update_fraction_above_null: null
+    minimum_functional_change_fraction_above_null: null
+  objective:
+    minimum_episode_decrease_fraction: null
+  frozen_gate_manifest:
+    path: null
+    sha256: null
+  unresolved_fields:
+    - positive_coverage.minimum_cells
+    - positive_coverage.minimum_corruption_families
+    - positive_coverage.minimum_datasets
+    - clean_safety.clean_iou_equivalence_margin
+    - operating_point_safety.max_pd_drop
+    - operating_point_safety.max_fa_increase_per_million_pixels
+    - activity.minimum_parameter_update_fraction_above_null
+    - activity.minimum_functional_change_fraction_above_null
+    - objective.minimum_episode_decrease_fraction
+    - frozen_gate_manifest.path
+    - frozen_gate_manifest.sha256
+  resolution_policy: >-
+    Populate every null field from a source-side preregistered frozen margin or
+    null-floor manifest before any new formal experiment. Do not infer margins
+    from the current negative Stage 1 result. Until then, fail closed.
+
+no_eligible_candidate_action:
+  stage1: write_negative_receipt_and_exit_zero
+  stage2_allowed: false
+  stage3_allowed: false
+  route_decision: stop_before_stage2

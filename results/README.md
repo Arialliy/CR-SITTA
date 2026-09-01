@@ -47,6 +47,104 @@ TENT-SS 协议/校准资产。它只把既有 test ID 用作泄漏检查，不�
 不包含主论文性能结论；eligibility 固定为 `protocol_asset_nonperformance`、
 `main_paper_table: false`，仅供 development-only 方法校准使用。
 
+`binary_tent/ss_calibration_v2/` 的 Stage 1 工程协议已经完成，但科学效用门未
+通过：被排序选出的 3 个 SGD 候选在全部 39 个 cell 上均没有二值预测或指标
+变化，其余 Adam 候选虽在少数 cell 有局部收益，但 39-cell macro IoU 均为负。
+因此 Stage 2/3 保持禁止。v2 历史工件和封存源码快照只作为不可改写的负基线
+保留；独立的
+`binary_tent/ss_calibration_v2_negative_archive/` 用于保存负结果判定和哈希，
+不得进入正式 paper-result 索引。后续科学门在 v3 中实现，且必须先过滤合格
+候选，再进行 Top-K 排名。
+
+历史 v2 runner 的未修改源码另存于
+`binary_tent/ss_calibration_v2_negative_archive_code_supplement_v1/`，只用于负结果
+复现审计，固定 `paper_result: false`、`stage2_authorization: false`；它不能恢复
+Stage 2，只能在隔离的历史环境中重放。当前活动 runner 的 `worker-stage2`、
+`aggregate-final`、`launch-stage2` 三个入口均永久 fail closed，在读取配置、申请
+GPU、构造 worker 命令或创建输出前返回 `SCIENTIFIC_GATE_BLOCKED`（退出码 3）。
+补充封存可独立验证：
+
+```bash
+./.conda/bin/python \
+  scripts/archive_binary_tent_ss_v2_runner_source.py --verify-only
+```
+
+v3 的生产授权入口不再接受调用者提供的 receipt 路径或 SHA。它只信任代码内固定
+的配置摘要，并沿 `formal aggregate → frozen gate manifest / Stage1 records /
+diagnostics → selector-v3 重算 receipt` 验证完整证据链。当前配置仍有未冻结阈值，
+所以 `run_binary_tent_ss_calibration_v3.py authorize-stage2` 必须返回
+`SCIENTIFIC_GATE_BLOCKED`（退出码 3）。
+
+后续失败机理诊断使用 `configs/tent_failure_diagnostics_v1.yaml`，输出固定在
+`cr_sitta/tent_failure_diagnostics_v1/`。它只读取现有 3×64×13 source-train
+cache；不创建验证集，不打开 test 图像或标签。训练 mask 只在全部 label-free
+episode 完成后进入外层 oracle analyzer，方法侧标签访问恒为 0。该目录始终是
+`paper_result: false`，不能用于恢复 Stage 2；正式 D0 shard 还必须先通过共享熵
+梯度与冻结 v2 独立执行路径的逐候选 bit-exact equivalence。该等价门必须由
+3 个独立 `exec` 新鲜进程重复，绑定 Linux PID 与 `/proc` start-time，并对 3 个
+进程对的 pre/post logits、梯度、参数增量、更新张量数和 step norm 做严格复验。
+父进程还会签发随机 run/child nonce，并绑定实际启动命令、PID/start-time、退出码、
+stdout/stderr 与 receipt 哈希的 launch transcript。该证据说明受支持 runner 确实
+执行了三次新进程；没有外部信任根时，不将其表述为对本机特权伪造的密码学证明。
+本地攻击者若能同时改写 artifact 与对应 checksum/SHA ledger，属于明确不覆盖的
+威胁范围；这些摘要用于发现非成对篡改、意外损坏和受支持 runner 内的协议漂移，
+不是外部签名或远程证明。
+单进程 receipt 写入 `equivalence/runs/<dataset>/`；只有三次均通过时才发布固定的
+`equivalence/<dataset>.json`。正式 shard 同时复验完整 113 文件负结果档案、
+`NEGATIVE_RESULT.json`、`SHA256SUMS` 和冻结的 Stage-1 records SHA，而不是只信任
+一份 JSONL。D0 只解释失败机理；即便 D0 完成，Stage 2/3 仍保持禁止。
+
+若 worker 在 receipt 构造前因工程异常退出，不会伪造单进程 receipt；这类事件
+单独登记在 `cr_sitta/tent_failure_diagnostics_v1/incidents/`，固定为非论文、
+非选择证据。2026-09-01 的首次 NUAA-SIRST equivalence 尝试即按此规则记录：它
+暴露了 float32 存储可见步长与连续 float64 公式的参考域错误，没有产生 canonical
+equivalence、shard 或 aggregate，也不代表 Adam 候选的科学失败。
+同日第二次 NUAA-SIRST equivalence 尝试也在 canonical receipt 前安全停止：CUDA
+同设备参考对 106/106 个参数张量及 318/318 个 optimizer-state 张量均为 bit-exact，
+但 CPU 原生 float32 重放与 CUDA 端点在两个标量上相差 1 ULP。该事件记录为
+`20260901_nuaa_equivalence_cross_backend_replay_failure.json`；它暴露的是把跨后端
+数值可移植性诊断误作执行正确性硬门的问题，不是 Adam、D0 或科学门结果。
+
+每个数据集先在一张隔离 GPU 上生成三进程等价 receipt，随后才允许生成对应
+formal shard；三个 shard 都通过后再聚合。所有这些产物均
+固定 `selection_authorized: false`、`stage2_authorized: false` 和
+`stage3_authorized: false`。
+
+完整正式 D0 命令如下。示例中的 GPU 编号按实际空闲隔离卡替换；正式 `run`
+不传 `--condition` 或 `--candidate`，并保持默认 `--max-images 64`；使用任何
+筛选或更小样本数都只能算 smoke：
+
+```bash
+for ds in IRSTD-1K NUAA-SIRST NUDT-SIRST; do
+  env CUDA_VISIBLE_DEVICES=0 PYTHONHASHSEED=42 \
+    CUBLAS_WORKSPACE_CONFIG=:4096:8 CUDA_DEVICE_ORDER=PCI_BUS_ID \
+    ./.conda/bin/python scripts/run_tent_failure_diagnostics.py \
+    equivalence-repro \
+    --dataset "$ds" --device cuda:0 \
+    --output "results/cr_sitta/tent_failure_diagnostics_v1/equivalence/${ds}.json"
+
+  env CUDA_VISIBLE_DEVICES=0 PYTHONHASHSEED=42 \
+    CUBLAS_WORKSPACE_CONFIG=:4096:8 CUDA_DEVICE_ORDER=PCI_BUS_ID \
+    ./.conda/bin/python scripts/run_tent_failure_diagnostics.py run \
+    --dataset "$ds" --device cuda:0 \
+    --equivalence-receipt \
+    "results/cr_sitta/tent_failure_diagnostics_v1/equivalence/${ds}.json" \
+    --output "results/cr_sitta/tent_failure_diagnostics_v1/shards/${ds}"
+done
+
+./.conda/bin/python scripts/run_tent_failure_diagnostics.py aggregate \
+  --shard results/cr_sitta/tent_failure_diagnostics_v1/shards/IRSTD-1K \
+  --shard results/cr_sitta/tent_failure_diagnostics_v1/shards/NUAA-SIRST \
+  --shard results/cr_sitta/tent_failure_diagnostics_v1/shards/NUDT-SIRST \
+  --output results/cr_sitta/tent_failure_diagnostics_v1/aggregate
+
+./.conda/bin/python scripts/run_tent_failure_diagnostics.py verify \
+  --path results/cr_sitta/tent_failure_diagnostics_v1/shards/IRSTD-1K
+
+./.conda/bin/python scripts/run_tent_failure_diagnostics.py verify-aggregate \
+  --path results/cr_sitta/tent_failure_diagnostics_v1/aggregate
+```
+
 AdaBN 实现门禁使用固定训练域样本，单独写入
 `adabn/adabn_source_pilot_smoke_v1/`。该目录必须标记
 `paper_result: false` 和 `performance_metrics_computed: false`；其中的训练域

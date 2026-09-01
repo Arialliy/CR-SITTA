@@ -1,0 +1,177 @@
+schema_version: 1
+protocol_id: cr-sitta-nsfpn-bn-affine-groups-v1
+created_at: "2026-09-01"
+
+scope:
+  stage: source_side_parameter_group_receptivity_pilot
+  paper_result: false
+  source_train_derived: true
+  use_test_images: false
+  use_test_labels: false
+  dynamic_test_time_group_selection: forbidden
+  disclosure: >-
+    This file freezes only the semantic BN-affine parameter partition and the
+    P0--P5 factorial candidate definitions. It contains no scientific result
+    and does not select a winning layer group.
+
+implementation:
+  path: tta/parameter_groups.py
+  sha256: 3b36c9f55728c383d13c64527a1f855029f9d3b484a36713e73030c071032184
+
+frozen_host:
+  model_type: model.MSHNet_NSFPN.MSHNet_NSFPN
+  checkpoint_role: best_miou
+  checkpoint_load: exact_keys_exact_shapes_strict_true
+  inherited_checkpoint_limitation: >-
+    These source checkpoints were selected by repeated evaluation on the fixed
+    test split during source training. The present inventory performs no test
+    access and does not repair that inherited limitation.
+  best_miou_checkpoints:
+    IRSTD-1K:
+      path: results/retraining_fixed_split/IRSTD-1K/best_miou.pth.tar
+      sha256: ee8d5c3af67d7c93ff6be25b169bd8fd59afcd776afd173b4e230ad8dc8aa8b2
+    NUAA-SIRST:
+      path: results/retraining_fixed_split/NUAA-SIRST/best_miou.pth.tar
+      sha256: 23feea50a847cdfc9874fe67d338a3884d9afa75d7a27b9b71a62ff2d00379cf
+    NUDT-SIRST:
+      path: results/retraining_fixed_split/NUDT-SIRST/best_miou.pth.tar
+      sha256: a67d3a7e2597d201e1fecf32b7f218aefa8274ad0443d2726197d84f44d1343e
+  model_inventory:
+    named_modules_sha256: 581e0bc592ceea4e72420f54f9a20e9c9b07199b45928fa61ec3e60286b87990
+    bn_affine_inventory_sha256: 3a4ba5e95c52100f9b1a75a277d33e4685c880b055df4f5a794ca03f9a060955
+    checkpoint_inventory_identical_across_all_three_datasets: true
+    bn_module_count: 53
+    parameter_tensor_count: 106
+    scalar_parameter_count: 8736
+
+parameter_space:
+  kind: batchnorm2d_affine_only
+  affine_tensors_per_bn: [weight, bias]
+  full_model_coverage_required_before_subset_collection: true
+  unknown_bn_action: fail_closed
+  multiply_classified_bn_action: fail_closed
+  missing_prefix_anchor_action: fail_closed
+  nonaffine_bn_action: fail_closed
+  shared_parameter_action: fail_closed
+  empty_selected_candidate_action: fail_closed
+
+  leaf_groups:
+    encoder:
+      include_prefixes: [encoder_0, encoder_1, encoder_2, encoder_3]
+      bn_module_count: 17
+      parameter_tensor_count: 34
+      scalar_parameter_count: 2304
+    middle:
+      include_prefixes: [middle_layer]
+      bn_module_count: 5
+      parameter_tensor_count: 10
+      scalar_parameter_count: 2560
+    nsfpn_lateral:
+      include_prefixes: [fpn.lateral_convs]
+      bn_module_count: 4
+      parameter_tensor_count: 8
+      scalar_parameter_count: 512
+    nsfpn_output:
+      include_prefixes: [fpn.fpn_convs]
+      bn_module_count: 4
+      parameter_tensor_count: 8
+      scalar_parameter_count: 512
+    nsfpn_sfs:
+      include_prefixes: [fpn.crossattn_list]
+      bn_module_count: 6
+      parameter_tensor_count: 12
+      scalar_parameter_count: 768
+    decoder_3:
+      include_prefixes: [decoder_3]
+      bn_module_count: 4
+      parameter_tensor_count: 8
+      scalar_parameter_count: 1024
+    decoder_2:
+      include_prefixes: [decoder_2]
+      bn_module_count: 5
+      parameter_tensor_count: 10
+      scalar_parameter_count: 640
+    decoder_1:
+      include_prefixes: [decoder_1]
+      bn_module_count: 5
+      parameter_tensor_count: 10
+      scalar_parameter_count: 320
+    decoder_0:
+      include_prefixes: [decoder_0]
+      bn_module_count: 3
+      parameter_tensor_count: 6
+      scalar_parameter_count: 96
+    final_head:
+      include_prefixes: [output_0, output_1, output_2, output_3, final]
+      allow_zero_bn_members: true
+      bn_module_count: 0
+      parameter_tensor_count: 0
+      scalar_parameter_count: 0
+      disclosure: >-
+        The current output heads are Conv2d-only and contain no BatchNorm2d.
+        P5 is therefore explicitly unavailable under the BN-affine-only
+        parameter contract; no head parameter is fabricated.
+
+  aliases:
+    decoder_high: [decoder_3, decoder_2]
+    decoder_low: [decoder_1, decoder_0]
+    all_decoder: [decoder_3, decoder_2, decoder_1, decoder_0]
+    nsfpn_output_plus_decoder:
+      [nsfpn_output, decoder_3, decoder_2, decoder_1, decoder_0]
+    all_bn:
+      [encoder, middle, nsfpn_lateral, nsfpn_output, nsfpn_sfs,
+       decoder_3, decoder_2, decoder_1, decoder_0, final_head]
+
+factorial_pilot:
+  P0:
+    label: all_BN_affine_negative_baseline
+    select: [all_bn]
+    runnable: true
+    parameter_tensor_count: 106
+    scalar_parameter_count: 8736
+  P1:
+    label: decoder_0_BN_affine
+    select: [decoder_0]
+    runnable: true
+    parameter_tensor_count: 6
+    scalar_parameter_count: 96
+  P2:
+    label: decoder_1_plus_decoder_0_BN_affine
+    select: [decoder_low]
+    runnable: true
+    parameter_tensor_count: 16
+    scalar_parameter_count: 416
+  P3:
+    label: all_decoder_BN_affine
+    select: [all_decoder]
+    runnable: true
+    parameter_tensor_count: 34
+    scalar_parameter_count: 2080
+  P4:
+    label: NS_FPN_output_side_plus_decoder_BN_affine
+    select: [nsfpn_output_plus_decoder]
+    runnable: true
+    parameter_tensor_count: 42
+    scalar_parameter_count: 2592
+  P5:
+    label: final_head_BN_affine_if_available
+    select: [final_head]
+    runnable: false
+    parameter_tensor_count: 0
+    scalar_parameter_count: 0
+    blocked_reason: current_final_head_has_no_BatchNorm2d
+
+future_selection_rule:
+  evidence_scope: frozen_source_train_side_calibration_only
+  criteria:
+    - supervised_unsupervised_gradient_alignment
+    - macro_global_iou_delta
+    - clean_safety
+    - false_alarm_safety
+    - effective_update_rank
+  test_result_driven_selection: forbidden
+
+outputs:
+  root: results/cr_sitta/parameter_group_pilot_v1
+  inventory_filename: parameter_group_inventory.json
+  refuse_overwrite: true

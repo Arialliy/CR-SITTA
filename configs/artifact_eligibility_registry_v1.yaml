@@ -357,3 +357,32 @@ artifacts:
       It uses test IDs only as a leakage guard, creates no validation split,
       and is a development-only calibration input rather than a main-paper
       performance result.
+
+  - artifact_id: binary_tent_ss_stage1_v2_negative_archive
+    root: results/binary_tent/ss_calibration_v2_negative_archive
+    artifact_role: stage1_negative_calibration_audit_nonpaper
+    identity:
+      mode: full_tree
+      expected_sha256: dc8ba74b2b626bd1ffe92f1d22c23cd6279b9e26a8e45eab140ecd21d26973f8
+    artifact_complete: true
+    formal_protocol_complete: false
+    scientific_eligibility:
+      tier: engineering_smoke
+      main_paper_table: false
+      reason_codes:
+        - stage1_scientific_gate_failed
+        - no_positive_macro_iou_candidate
+        - stage2_aborted_without_formal_output
+        - negative_result_for_method_redesign_only
+    selection:
+      source_checkpoint_role: best_miou
+      checkpoint_selection_split: test
+      tta_calibration_split: train
+      test_used_for_checkpoint_selection: true
+      test_used_for_tta_selection: false
+    notes: >-
+      Immutable copy of the completed 390-cell, 24,960-episode TENT-SS v2
+      Stage 1 plus the v3 retrospective failure receipt. The protocol gate
+      passed, the scientific gate failed, no candidate was eligible, and no
+      Stage-2 shard or aggregate was published. This artifact is excluded from
+      every paper-result table and exists only for audit and method redesign.

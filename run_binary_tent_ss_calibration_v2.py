@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Execute the source-train-derived, SS-only Binary TENT calibration v2.
+"""Inspect or replay the source-train-derived Binary TENT calibration v2.
 
 The calibration evidence is exclusively ``source_running_statistics`` (SS).
-The resulting optimizer/LR is later *applied* to both SS and BS, but no BS
-episode is accepted by this runner or its selector.  ``validate`` is a
+Historically, the resulting optimizer/LR was intended to be applied to both
+SS and BS, but the v2 scientific gate failed.  Therefore ``worker-stage2``,
+``aggregate-final``, and ``launch-stage2`` are permanently fail-closed: they
+return ``SCIENTIFIC_GATE_BLOCKED`` with exit code 3 before configuration I/O,
+GPU leasing, command construction, or output creation.  No BS episode is
+accepted by this runner or its selector.  ``validate`` is a
 metadata/opaque-byte operation: it never calls ``numpy.load``, constructs a
 model, initializes CUDA, creates a validation split, or writes formal output.
 
@@ -60,6 +64,10 @@ ZERO_UPDATE_POLICY = (
     "allow_only_with_one_finite_optimizer_step_temporary_state_and_exact_reset"
 )
 STRENGTH_DIAGNOSTICS_FILENAME = "lr_strength_diagnostics.jsonl"
+EXIT_SCIENTIFIC_GATE_BLOCKED = 3
+LEGACY_STAGE2_ROLES = frozenset(
+    {"worker-stage2", "aggregate-final", "launch-stage2"}
+)
 EXPECTED_CRITICAL_CODE_PATHS = (
     "run_binary_tent_ss_calibration_v2.py",
     "run_binary_tent_source_calibration.py",
@@ -197,6 +205,25 @@ CacheContext = core.CacheContext
 CalibrationContract = core.CalibrationContract
 RuntimeSeal = core.RuntimeSeal
 RuntimeSealMonitor = core.RuntimeSealMonitor
+
+
+class LegacyV2Stage2BlockedError(CalibrationExecutionError):
+    """The legacy Top-3 path cannot satisfy the v3 scientific gate."""
+
+
+def _reject_legacy_v2_stage2() -> None:
+    """Permanently block every active v2 Stage-2 mutation boundary.
+
+    The byte-exact historical runner is retained in the verified negative
+    archive code supplement.  Active Stage-1 code paths are left unchanged,
+    but their Top-3 receipt is not a v3 scientific authorization.
+    """
+
+    raise LegacyV2Stage2BlockedError(
+        "legacy Binary-TENT-SS v2 Stage 2 is permanently blocked: the v2 "
+        "Top-3 receipt does not pass or represent the v3 scientific gate; "
+        "use only a reviewed v3 Stage2Authorization backend"
+    )
 
 
 def _mapping(value: Any, label: str) -> Mapping[str, Any]:
@@ -1716,6 +1743,7 @@ def _bind_verified_stage1_receipt(
 
 
 def run_stage2_worker(args: argparse.Namespace) -> dict[str, Any]:
+    _reject_legacy_v2_stage2()
     inherited = core._verify_inherited_gpu_lease(required=True)
     contract = load_contract(args.execution_config)
     gpu_lease = core._validate_formal_gpu_lease(
@@ -2778,6 +2806,7 @@ def _verify_final_aggregate(
 
 
 def aggregate_final(args: argparse.Namespace) -> dict[str, Any]:
+    _reject_legacy_v2_stage2()
     contract = load_contract(args.execution_config)
     base_seal, _ = capture_runtime_seal(contract)
     stage1 = _verify_stage1_aggregate(contract, base_seal)
@@ -3087,6 +3116,7 @@ def _launch_stage1_locked(
 
 
 def launch_stage2(args: argparse.Namespace) -> dict[str, Any]:
+    _reject_legacy_v2_stage2()
     contract = load_contract(args.execution_config)
     gpu_ids = _gpu_ids(args.gpu_ids)
     return core._with_stage_launcher_lock(
@@ -3104,6 +3134,7 @@ def _launch_stage2_locked(
     gpu_ids: tuple[str, ...],
     stage_claim_fd: int,
 ) -> dict[str, Any]:
+    _reject_legacy_v2_stage2()
     expected_receipt = _stage1_receipt_path(contract).resolve()
     if args.top3_receipt is not None:
         _equal(
@@ -3235,7 +3266,14 @@ def build_parser() -> argparse.ArgumentParser:
     stage1_worker.add_argument("--process-id", required=True)
     stage1_worker.add_argument("--device", default="cuda:0")
 
-    stage2_worker = subparsers.add_parser("worker-stage2")
+    stage2_worker = subparsers.add_parser(
+        "worker-stage2",
+        help="PERMANENTLY BLOCKED: historical v2 Stage 2 worker",
+        description=(
+            "PERMANENTLY BLOCKED: exits 3 before configuration, GPU, command, "
+            "or output side effects"
+        ),
+    )
     add_config(stage2_worker)
     stage2_worker.add_argument("--top3-receipt", type=Path, required=True)
     stage2_worker.add_argument("--process-id", required=True)
@@ -3244,13 +3282,27 @@ def build_parser() -> argparse.ArgumentParser:
 
     aggregate1 = subparsers.add_parser("aggregate-stage1")
     add_config(aggregate1)
-    aggregate2 = subparsers.add_parser("aggregate-final")
+    aggregate2 = subparsers.add_parser(
+        "aggregate-final",
+        help="PERMANENTLY BLOCKED: historical v2 Stage 2 aggregation",
+        description=(
+            "PERMANENTLY BLOCKED: exits 3 before reading or publishing any "
+            "Stage 2 artifact"
+        ),
+    )
     add_config(aggregate2)
 
     launch1 = subparsers.add_parser("launch-stage1")
     add_config(launch1)
     launch1.add_argument("--gpu-ids", default="1,2")
-    launch2 = subparsers.add_parser("launch-stage2")
+    launch2 = subparsers.add_parser(
+        "launch-stage2",
+        help="PERMANENTLY BLOCKED: v2 failed the v3 scientific gate",
+        description=(
+            "PERMANENTLY BLOCKED: exits 3 before GPU leasing, worker command "
+            "construction, or output creation"
+        ),
+    )
     add_config(launch2)
     launch2.add_argument("--gpu-ids", default="1,2")
     launch2.add_argument("--top3-receipt", type=Path)
@@ -3258,6 +3310,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
+    if args.role in LEGACY_STAGE2_ROLES:
+        _reject_legacy_v2_stage2()
     dispatch = {
         "validate": validate_only,
         "worker-stage1": run_stage1_worker,
@@ -3274,6 +3328,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         receipt = run(args)
+    except LegacyV2Stage2BlockedError as error:
+        print(f"SCIENTIFIC_GATE_BLOCKED: {error}", file=sys.stderr)
+        return EXIT_SCIENTIFIC_GATE_BLOCKED
     except (CalibrationExecutionError, FileExistsError, FileNotFoundError, ValueError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2
