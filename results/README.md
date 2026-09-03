@@ -32,10 +32,12 @@ TTA Pilot 仅用于方法超参数校准；它不是新的数据划分、不是�
 当前 `best_miou` 和 `best_pd` Source checkpoint 均由 500 epoch 后逐 epoch
 评价固定 test 得到，因此现有 Source、corruption、AdaBN 与相关导出属于
 `development_test_selected`，不能表述为未触碰 test 的无偏论文主表结果。
-版本化资格规则见 `configs/artifact_eligibility_registry_v1.yaml`；运行
-`./.conda/bin/python scripts/validate_result_eligibility.py materialize` 后会在
-本目录生成被 Git 忽略的 `artifact_eligibility_registry_v1.json`，且不会改写
-任何已经封存的实验产物。
+基础资格规则见 `configs/artifact_eligibility_registry_v1.yaml`；已完成的
+best-pd development axis 由 append-only 的
+`configs/artifact_eligibility_registry_v2.yaml` 登记。运行
+`./.conda/bin/python scripts/validate_result_eligibility_v2.py materialize` 后会在
+本目录生成被 Git 忽略的 `artifact_eligibility_registry_v2.json`，且会先严格验证
+v1 父 registry，不改写任何已经封存的实验产物。
 
 TTA 只在训练侧 Pilot 上选择一次超参数：以 `best_miou` 为校准锚点；随后
 `best_pd` 必须复用完全相同的冻结参数，不允许再调一次。完整 CR-SITTA 冻结后，
@@ -94,6 +96,30 @@ stdout/stderr 与 receipt 哈希的 launch transcript。该证据说明受支持
 `NEGATIVE_RESULT.json`、`SHA256SUMS` 和冻结的 Stage-1 records SHA，而不是只信任
 一份 JSONL。D0 只解释失败机理；即便 D0 完成，Stage 2/3 仍保持禁止。
 
+当前正式状态以
+`cr_sitta/tent_failure_diagnostics_v3_formal_stage_a/aggregate_phase/R0/`
+为准：39/39 cells 和 24,960 条外层记录均已完成并通过发布时重建，10 个候选中
+0 个通过冻结科学门。该结果是完整的训练侧 development negative evidence；
+R1/R2、Stage 2/3 以及旧的全-BN entropy 参数更新路线均保持禁止。
+
+P4 非自适应多视图 teacher 的正式训练侧 Pilot64 screen 保存在
+`cr_sitta/nonadaptive_teacher_screen_v1/`。三个数据集各完成 13 个条件和 64 张图，
+候选生成阶段共执行 2,496 个 image-condition episode；outer evaluator 在候选
+artifact 完整封存后才读取训练侧 Pilot mask，并汇总 10×3×13=390 个 candidate
+cell。正式 aggregate 位于 `aggregate_phase/R0/`，协议与整数守恒均通过，但科学
+状态为 `scientific_no_eligible`：10 个候选中 0 个合格。最佳候选
+`flip4_source_anchor_beta_0_5` 的 36-cell non-clean macro ΔIoU 为
+`+0.000721923`，低于冻结的严格门槛 `>+0.001`，因此 P5 仍未授权。
+该 v1 运行还绑定本机保留的决策溯源 memo 与被忽略的 P3 前序 receipts；仓库公开
+其计算配置、runner 和门函数，但 fresh clone 不包含完整的历史 artifact 复验包。
+
+该 v1 receipt 在发布后审计中发现一个 dataset-scope 实现问题：名为
+`dataset_nonclean_delta_iou/pd` 的字段实际混入了 clean，使用 13 cells；Fa 的
+`each_dataset` 使用 13 cells 则是正确的。旧 v1 artifact 与哈希保持不可改写；
+后续以 append-only 的 scope-correction receipt 用每数据集 12 个 non-clean cells
+重算 IoU/Pd。该修正不会改变任何候选的 reason codes 或 eligibility，结论仍为
+0/10、P5 禁止。不得把旧 receipt 中这两个误标字段直接解释为 non-clean 数值。
+
 若 worker 在 receipt 构造前因工程异常退出，不会伪造单进程 receipt；这类事件
 单独登记在 `cr_sitta/tent_failure_diagnostics_v1/incidents/`，固定为非论文、
 非选择证据。2026-09-01 的首次 NUAA-SIRST equivalence 尝试即按此规则记录：它
@@ -110,9 +136,27 @@ formal shard；三个 shard 都通过后再聚合。所有这些产物均
 固定 `selection_authorized: false`、`stage2_authorized: false` 和
 `stage3_authorized: false`。
 
-完整正式 D0 命令如下。示例中的 GPU 编号按实际空闲隔离卡替换；正式 `run`
-不传 `--condition` 或 `--candidate`，并保持默认 `--max-images 64`；使用任何
-筛选或更小样本数都只能算 smoke：
+当前 D0-v3 Stage-A 的正式 R0 入口如下。grid 串行执行全部 3×13 个 candidate、
+candidate verify、outer 和 outer verify；aggregate 只在 39 个 cell 全部通过后
+发布，并且始终不授权 R1/R2 或 Stage 2：
+
+```bash
+./.conda/bin/python scripts/run_d0_v3_formal_stage_a_r0_grid.py validate
+./.conda/bin/python scripts/run_d0_v3_formal_stage_a_r0_grid.py run \
+  --cuda-visible-device 0
+
+CUDA_VISIBLE_DEVICES= ./.conda/bin/python \
+  scripts/run_d0_v3_formal_stage_a_r0_aggregate.py preflight
+CUDA_VISIBLE_DEVICES= ./.conda/bin/python \
+  scripts/run_d0_v3_formal_stage_a_r0_aggregate.py run
+CUDA_VISIBLE_DEVICES= ./.conda/bin/python \
+  scripts/run_d0_v3_formal_stage_a_r0_aggregate.py verify
+```
+
+下面是历史 D0-v1 的归档命令，仅用于旧 artifact 复验，不代表当前正式入口。
+示例中的 GPU 编号按实际空闲隔离卡替换；旧 `run` 不传 `--condition` 或
+`--candidate`，并保持默认 `--max-images 64`；使用任何筛选或更小样本数都只能算
+smoke：
 
 ```bash
 for ds in IRSTD-1K NUAA-SIRST NUDT-SIRST; do

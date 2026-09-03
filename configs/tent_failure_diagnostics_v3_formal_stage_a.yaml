@@ -1,0 +1,321 @@
+schema_version: 3
+protocol_id: cr-sitta-d0-v3-formal-stage-a
+created_at: "2026-09-02"
+
+frozen_parent_bindings:
+  engineering_config:
+    path: configs/tent_failure_diagnostics_v2_independent_candidates.yaml
+    sha256: a839af3599111854196548cfa0b05ab5b3b4ba3f60ab0829ee5a827ce871728d
+    read_only: true
+  engineering_smoke:
+    root: results/cr_sitta/tent_failure_diagnostics_v2_independent_candidates/engineering_smoke
+    aggregate_sha256: 9a46508c5c10478f9d2ef3b0a359435db90d93a1a3cc3a9662c3764c46ec27c2
+    passed_required: true
+    scientific_evidence: false
+
+scope:
+  phase: P3_formal_tent_failure_diagnostics_stage_a
+  source_train_derived: true
+  split_name: train
+  split_role: frozen_pilot64
+  no_validation_split: true
+  use_validation_payload: false
+  use_test_payload: false
+  allowed_payload_roles: [train_pilot64_image, train_pilot64_metadata, train_pilot64_outer_target]
+  forbidden_payload_roles: [validation_image, validation_target, test_image, test_target, test_prediction]
+  dataset_count: 3
+  condition_count_per_dataset: 13
+  image_count_per_condition: 64
+  candidate_count: 10
+  paper_result: false
+  paper_test_result: false
+  development_test_selected_result: false
+  formal_protocol_complete_initial: false
+  scientific_status_initial: not_evaluated
+  stage2_authorized_default: false
+  disclosure: >-
+    Formal P3 source-train Pilot64 diagnosis. Candidate adaptation is strictly
+    label-free. Train targets may be opened only by the outer evaluator after
+    the matching candidate-phase completion receipt exists. Validation and
+    test payloads are forbidden. Protocol completion and scientific utility
+    are independent statuses, and this protocol never directly authorizes
+    Stage 2.
+
+cache:
+  root: results/binary_tent/ss_calibration_cache_v2
+  protocol_path: configs/binary_tent_ss_calibration_cache_v2.yaml
+  protocol_sha256: e225311cce252125eaf3a2b47eeeea4cde60d0363c8c71f48494d70e41c2aa3e
+  execution_protocol_path: configs/binary_tent_ss_calibration_execution_v2.yaml
+  execution_protocol_sha256: d5ca162ad41e1d18df96ee235da1ff1fec282db1ae6068eef3e1466166b31264
+  target_relative_path: outer_evaluator/targets.npy
+
+datasets:
+  IRSTD-1K:
+    train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+    checkpoint_role: best_miou
+    checkpoint_path: results/retraining_fixed_split/IRSTD-1K/best_miou.pth.tar
+    checkpoint_sha256: ee8d5c3af67d7c93ff6be25b169bd8fd59afcd776afd173b4e230ad8dc8aa8b2
+  NUAA-SIRST:
+    train_split_sha256: 324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4
+    checkpoint_role: best_miou
+    checkpoint_path: results/retraining_fixed_split/NUAA-SIRST/best_miou.pth.tar
+    checkpoint_sha256: 23feea50a847cdfc9874fe67d338a3884d9afa75d7a27b9b71a62ff2d00379cf
+  NUDT-SIRST:
+    train_split_sha256: e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3
+    checkpoint_role: best_miou
+    checkpoint_path: results/retraining_fixed_split/NUDT-SIRST/best_miou.pth.tar
+    checkpoint_sha256: a67d3a7e2597d201e1fecf32b7f218aefa8274ad0443d2726197d84f44d1343e
+
+conditions:
+  - clean_S0
+  - gaussian_noise_S1
+  - gaussian_noise_S3
+  - gaussian_noise_S5
+  - gaussian_blur_S1
+  - gaussian_blur_S3
+  - gaussian_blur_S5
+  - low_contrast_S1
+  - low_contrast_S3
+  - low_contrast_S5
+  - stripe_noise_S1
+  - stripe_noise_S3
+  - stripe_noise_S5
+
+candidates:
+  - {candidate_id: Adam_lr_1em5, optimizer: Adam, learning_rate: 1.0e-5}
+  - {candidate_id: Adam_lr_3em5, optimizer: Adam, learning_rate: 3.0e-5}
+  - {candidate_id: Adam_lr_1em4, optimizer: Adam, learning_rate: 1.0e-4}
+  - {candidate_id: Adam_lr_3em4, optimizer: Adam, learning_rate: 3.0e-4}
+  - {candidate_id: Adam_lr_1em3, optimizer: Adam, learning_rate: 1.0e-3}
+  - {candidate_id: SGD_lr_1em5, optimizer: SGD, learning_rate: 1.0e-5}
+  - {candidate_id: SGD_lr_3em5, optimizer: SGD, learning_rate: 3.0e-5}
+  - {candidate_id: SGD_lr_1em4, optimizer: SGD, learning_rate: 1.0e-4}
+  - {candidate_id: SGD_lr_3em4, optimizer: SGD, learning_rate: 3.0e-4}
+  - {candidate_id: SGD_lr_1em3, optimizer: SGD, learning_rate: 1.0e-3}
+
+replicate_execution:
+  replicate_ids: [R0, R1, R2]
+  seed: 42
+  same_frozen_inputs_across_replicates: true
+  same_seed_across_replicates: true
+  independent_fresh_process_per_replicate: true
+  r0_candidate_policy: all_10_frozen_candidates
+  r0_cells_per_candidate: 39
+  r0_episodes_per_candidate: 2496
+  r0_total_candidate_episodes: 24960
+  followup_candidate_policy: r0_scientifically_eligible_only
+  followup_replicates: [R1, R2]
+  followup_cells_per_candidate_per_replicate: 39
+  followup_episodes_per_candidate_per_replicate: 2496
+  gradient_reuse: forbidden
+  fresh_model_method_optimizer_per_candidate_image: true
+  formal_completion_rule: >-
+    All ten candidates have a complete R0; each R0-eligible candidate has
+    complete independent R1 and R2; no R0-ineligible candidate is executed in
+    R1 or R2. An empty R0 eligible set is a complete early-stop outcome.
+
+payload_firewall:
+  candidate_phase:
+    method_label_accesses: 0
+    outer_evaluator_label_accesses: 0
+    train_target_bytes_opened: 0
+    train_target_deserialized: false
+    validation_payload_opens: 0
+    test_payload_opens: 0
+    completion_receipt_required: true
+  outer_evaluator:
+    allowed_target_role: train_pilot64_outer_target
+    target_load_timing: after_candidate_phase_completion_receipt_for_dataset_condition_replicate
+    target_visible_to_adaptation: false
+    target_visible_to_candidate_ranking_during_execution: false
+    validation_payload_opens: 0
+    test_payload_opens: 0
+
+formal_numeric_protocol:
+  no_op_thresholds:
+    parameter_null_floor: 0.0
+    logit_null_floor: 0.0
+    probability_null_floor: 0.0
+    probability_logit_consistency_atol: 1.0e-6
+    prediction_threshold: 0.5
+    near_threshold_lower: 0.45
+    near_threshold_upper: 0.55
+    entropy_eps: 1.0e-6
+    connectivity: 2
+    min_component_area: 1
+    max_centroid_distance: 3.0
+  optimizer_geometry:
+    inherited_from_parent_v2: true
+    runtime_hard_gate_reference: pytorch_2_1_2_single_tensor_same_device_native_dtype_bit_exact_after_v1
+    cross_backend_cpu_storage_replay_reference: pytorch_2_1_2_cpu_snapshot_native_dtype_cross_backend_storage_replay_diagnostic_v1
+    continuous_ideal_reference: continuous_float64_empty_state_first_step_v1
+    small_gradient_threshold: 1.0e-8
+    adam_near_sign_step_threshold: 0.9
+    verification_rtol: 1.0e-5
+    verification_atol: 1.0e-7
+  outer_oracle_task_loss:
+    role: train_only_outer_evaluator_gradient_alignment
+    used_by_adaptation: false
+    lambda_bce: 1.0
+    lambda_soft_iou: 1.0
+    eps: 1.0e-6
+    bce_reduction: mean_over_all_pixels
+    soft_iou_reduction: mean_over_sample
+    empty_target_convention: epsilon_smoothed_union_penalizes_foreground
+  alignment:
+    first_order_zero_tolerance: 0.0
+    selection_cosine_unit: per_episode_global_all_BN_affine_vector
+    zero_gradient_norm_policy: cosine_null_with_reason_code
+    selection_macro: equal_episode_mean_over_valid_global_cosines
+    selection_dataset_statistic: median_over_valid_global_cosines
+    both_gradients_nonzero_episode_denominator: 2496
+    fine_group_observations_per_candidate_replicate: 49920
+    fine_group_role: diagnostic_only_not_selection
+  aggregation_semantics:
+    cell_sufficient_statistics: pooled_over_64_images_before_metric_computation
+    global_iou:
+      numerator: pooled_intersection_pixels
+      denominator: pooled_union_pixels
+      zero_union_value: 1.0
+      convention: official
+    pd:
+      numerator: pooled_detected_targets
+      denominator: pooled_total_targets
+      zero_target_value: 0.0
+    fa_per_million_pixels:
+      numerator: pooled_false_alarm_pixels
+      denominator: pooled_total_image_pixels
+      multiplier: 1000000.0
+    foreground_fraction:
+      numerator: pooled_predicted_positive_pixels
+      denominator: pooled_total_image_pixels
+    cross_cell_aggregation: equal_cell_macro
+    macro_cell_counts:
+      overall: 39
+      nonclean: 36
+      clean: 3
+      per_dataset_nonclean: 12
+      per_corruption_family: 9
+
+stage_a_science_gate:
+  comparison_tolerance: 1.0e-12
+  filter_before_ranking: true
+  no_eligible_is_normal_scientific_result: true
+  r0_no_eligible_action: stop_without_R1_R2
+  final_no_eligible_action: stop_P3_parameter_update_route
+  every_replicate_must_pass_all_hard_gates: true
+  per_replicate:
+    nonclean_36_macro_delta_iou_strictly_greater_than: 0.0
+    minimum_positive_nonclean_datasets: 2
+    worst_nonclean_dataset_delta_iou_minimum: -0.002
+    minimum_positive_corruption_families: 3
+    worst_corruption_family_delta_iou_minimum: -0.005
+    overall_39_macro_delta_iou_strictly_greater_than: 0.0
+    clean_macro_delta_iou_minimum: -0.002
+    each_clean_dataset_delta_iou_minimum: -0.005
+    nonclean_macro_delta_pd_minimum: -0.010
+    each_nonclean_dataset_delta_pd_minimum: -0.020
+    clean_macro_delta_pd_minimum: -0.010
+    fa_delta_maximum_formula:
+      absolute_allowance_per_million_pixels: 10.0
+      source_fa_multiplier: 0.25
+      required_strata: [overall, nonclean, clean, dataset, corruption_family]
+    foreground_fraction:
+      delta_maximum: 0.001
+      adapted_maximum_formula: source_times_1.20_plus_1e_minus_6
+      source_multiplier: 1.20
+      epsilon: 1.0e-6
+      required_strata: [overall, nonclean, clean, dataset, corruption_family]
+    finite_gradient_fraction_minimum: 1.0
+    parameter_changed_episode_fraction_minimum: 0.95
+    functional_logit_threshold: 1.0e-6
+    functional_logit_changed_episode_fraction_minimum: 0.10
+    threshold_crossing_episode_fraction_minimum: 0.02
+    metric_sufficient_count_changed_episode_fraction_minimum: 0.02
+    entropy_decrease_episode_fraction_minimum: 0.80
+    alignment_macro_cosine_minimum: 0.05
+    minimum_positive_alignment_dataset_medians: 2
+    both_gradients_nonzero_fraction_minimum: 0.80
+  across_R0_R1_R2:
+    nonclean_36_macro_delta_iou_mean_minimum: 0.002
+    overall_39_macro_delta_iou_mean_minimum: 0.001
+  ranking_tie_break_order:
+    - higher_three_replicate_mean_nonclean_delta_iou
+    - higher_worst_replicate_nonclean_delta_iou
+    - higher_minimum_dataset_three_replicate_mean_nonclean_delta_iou
+    - higher_three_replicate_mean_clean_delta_iou
+    - lower_three_replicate_mean_nonclean_fa_delta
+    - lower_three_replicate_mean_nonclean_foreground_fraction_inflation
+    - higher_three_replicate_mean_nonclean_delta_pd
+    - lower_learning_rate
+    - fixed_optimizer_order_Adam_then_SGD
+    - lexicographically_lower_candidate_id
+  top_k: null
+  stage2_authorized_by_gate: false
+
+alignment_diagnostics:
+  fine_group_inventory_sha256: 47b0aca39e4fa471d49cbb89513e1ec66f29ac3d8a258f4e1c63542dea6087c1
+  fine_group_role: alignment_diagnostic_only
+  fine_group_optimizer_steps_forbidden_in_stage_a: true
+  fine_group_ids:
+    - encoder_0
+    - encoder_1
+    - encoder_2
+    - encoder_3
+    - middle
+    - fpn_lateral_0
+    - fpn_lateral_1
+    - fpn_lateral_2
+    - fpn_lateral_3
+    - fpn_output_0
+    - fpn_output_1
+    - fpn_output_2
+    - fpn_output_3
+    - fpn_sfs_0
+    - fpn_sfs_1
+    - fpn_sfs_2
+    - decoder_3
+    - decoder_2
+    - decoder_1
+    - decoder_0
+  structurally_ineligible:
+    final_head: frozen_nsfpn_final_head_has_no_batchnorm2d_affine_parameters
+
+stage_b_preregistration:
+  separate_stage_required: true
+  authorized_by_this_config: false
+  parameter_group_protocol_path: configs/parameter_group_pilot_v1.yaml
+  parameter_group_protocol_sha256: 3cfcdb768ca7adfbb85446fd14a9d02a89ba6fecd43ea25843783e571cb7b637
+  p0_role: stage_a_all_bn_reference_not_a_stage_b_candidate
+  runnable_coarse_groups:
+    P1: {label: decoder_0_BN_affine, parameter_tensor_count: 6, scalar_parameter_count: 96}
+    P2: {label: decoder_1_plus_decoder_0_BN_affine, parameter_tensor_count: 16, scalar_parameter_count: 416}
+    P3: {label: all_decoder_BN_affine, parameter_tensor_count: 34, scalar_parameter_count: 2080}
+    P4: {label: NS_FPN_output_side_plus_decoder_BN_affine, parameter_tensor_count: 42, scalar_parameter_count: 2592}
+  unavailable_group:
+    P5: {label: final_head_BN_affine_if_available, blocked_reason: current_final_head_has_no_BatchNorm2d}
+  replicate_policy:
+    initial: R0_all_preregistered_coarse_candidates
+    followup: R1_R2_for_R0_eligible_only
+    same_inputs_seed_independent_fresh_process: true
+  threshold_overrides:
+    nonclean_36_macro_delta_iou_mean_minimum: 0.003
+    overall_39_macro_delta_iou_mean_minimum: 0.002
+    all_other_stage_a_thresholds: inherited_unchanged
+  fine_20_group_role: alignment_diagnostic_only
+  stage2_authorized_by_stage_b_preregistration: false
+
+status_contract:
+  protocol_failure: exceptional_not_a_scientific_result
+  scientific_no_eligible: valid_completed_negative_result
+  scientific_passed: at_least_one_candidate_passed_all_frozen_gates
+  formal_protocol_complete_is_independent_of_scientific_status: true
+  stage2_requires_separate_signed_authorization: true
+  stage2_authorized: false
+
+output:
+  root: results/cr_sitta/tent_failure_diagnostics_v3_formal_stage_a
+  create_on_contract_load: false
+  atomic_no_replace: true
+  refuse_overwrite: true
+  formal_result_publication_authorized_initial: false

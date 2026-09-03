@@ -1,0 +1,136 @@
+schema_version: 2
+registry_id: cr-sitta-artifact-eligibility-registry-v2
+output: results/artifact_eligibility_registry_v2.json
+status: frozen
+
+parent_registry:
+  registry_id: cr-sitta-artifact-eligibility-registry-v1
+  config_path: configs/artifact_eligibility_registry_v1.yaml
+  config_sha256: c6643daa675b0c8b74a7b8fff85d3a64563e77772934d517d61205dd15621956
+  materialized_path: results/artifact_eligibility_registry_v1.json
+  materialized_sha256: e4f0e69a0bbca7c3134c029486c676758c053338fe8c0c7c9e425cc0c571ba54
+  generator_path: scripts/validate_result_eligibility.py
+  generator_sha256: a1925474e078a35a5be6a4b95b7d3d5f6d5b832dab14285340ec69d8068bf2d0
+  eligibility_module_path: metrics/result_eligibility.py
+  eligibility_module_sha256: 3dc9a177f5450ca6ae2e70bb2b1ccfa390bbafe0edd007be03afac59e85a90b2
+  artifact_count: 11
+  append_only: true
+
+policies:
+  official_split_model: train_test_only
+  validation_split_created: false
+  main_paper_requires_no_test_selection: true
+  existing_artifacts_are_immutable: true
+  append_only_parent_required: true
+
+stage_decisions:
+  P2_source_val:
+    status: skipped_by_user_constraint
+    artifact_created: false
+    validation_split_created: false
+    source_val_ids_created: false
+    final_paper_benchmark_authorized: false
+    reason_codes:
+      - user_requires_train_test_only
+      - no_validation_split
+
+# Frozen append-only declarations for the completed best_pd development axis.
+# These identities bind exact trees through verified manifest/completion chains;
+# they remain development-only because the checkpoints were selected on test.
+artifacts:
+  - artifact_id: clean_source_best_pd_standardized_export
+    root: results/baseline_checkpoint_axis_v2/best_pd
+    artifact_role: clean_source_best_pd_development_export
+    identity:
+      mode: sealed_manifest_chain
+      expected_sha256: de319dd2844e5cc9ef6152400f2f684885aac42e816e5b45ce310bde3c327480
+      exact_tree: true
+      seals:
+        - manifest: IRSTD-1K/artifact_manifest.json
+          manifest_sha256: 5985141724c64804b2240d2e317d81a11df59ec1705dc9b1a993210abb4a2470
+          completion: IRSTD-1K/COMPLETE.json
+          completion_sha256: ebb596b42bc7a866a7db7ed992794a521ef74ab62e537c5db828a76f35ba77d1
+        - manifest: NUAA-SIRST/artifact_manifest.json
+          manifest_sha256: 1b3005c0f8fffbdf1f3e9f97ed099475578de0e82a85bf248a77a515dcb77550
+          completion: NUAA-SIRST/COMPLETE.json
+          completion_sha256: 5d5f4110b243153569ebb0704955564cb61c8c8127fb0a3a9cc63bba263c33ed
+        - manifest: NUDT-SIRST/artifact_manifest.json
+          manifest_sha256: 3cf3667621398fbe5375a6d0e8a0e6c3b791a66164a496617a543ed7f291543a
+          completion: NUDT-SIRST/COMPLETE.json
+          completion_sha256: 7a2beabcb21a7e73886ebffc1166d1df279b488e9232eabaa9e6e25e0e710f04
+    artifact_complete: true
+    formal_protocol_complete: true
+    scientific_eligibility:
+      tier: development_test_selected
+      main_paper_table: false
+      reason_codes:
+        - source_checkpoint_test_selected
+    selection:
+      source_checkpoint_role: best_pd
+      checkpoint_selection_split: test
+      tta_calibration_split: none
+      test_used_for_checkpoint_selection: true
+      test_used_for_tta_selection: false
+    notes: Complete standardized clean export for all three datasets; development-only because the source checkpoint was selected on test.
+
+  - artifact_id: source_corruption_39_cell_best_pd
+    root: results/source_corruption_checkpoint_axis_v2/best_pd
+    artifact_role: source_corruption_best_pd_development_benchmark
+    identity:
+      mode: sealed_manifest_chain
+      expected_sha256: 2eac26cdc0632b5e5c7565f1eb10cde7796796dcedd43c4029381bfbc430e83c
+      exact_tree: true
+      seals:
+        - manifest: IRSTD-1K/artifact_manifest.json
+          manifest_sha256: ec0d53797fbaa5b063332d51e2ada1e112fb4a4a12c81fd59c77e5320c153cdf
+          completion: IRSTD-1K/COMPLETE.json
+          completion_sha256: 19cce90244c337247f2f4e5a8ae69c8950388d35b10ce92c4a43497480d743b2
+        - manifest: NUAA-SIRST/artifact_manifest.json
+          manifest_sha256: 0a55cf923814a4797b0358e0cc4b6a58a2f7a9b742c9464161da95d18e5f2cbf
+          completion: NUAA-SIRST/COMPLETE.json
+          completion_sha256: d307e8547db8738f7d543fc03e7e36c66af61c6bf022ce8dc0ddc9c11e48c8dc
+        - manifest: NUDT-SIRST/artifact_manifest.json
+          manifest_sha256: e5eba136844d8367355c044d8d22b026f0774716dd9135c06a212fd23b36a0d3
+          completion: NUDT-SIRST/COMPLETE.json
+          completion_sha256: 3fa56ec71345d4610596d920d0e6c607832d63173ec5bf20cca02a3ec6908f8e
+    artifact_complete: true
+    formal_protocol_complete: true
+    scientific_eligibility:
+      tier: development_test_selected
+      main_paper_table: false
+      reason_codes:
+        - source_checkpoint_test_selected
+    selection:
+      source_checkpoint_role: best_pd
+      checkpoint_selection_split: test
+      tta_calibration_split: none
+      test_used_for_checkpoint_selection: true
+      test_used_for_tta_selection: false
+    notes: Complete 3-dataset x 13-condition Source benchmark with no additional best_pd tuning; development-only because the source checkpoint was selected on test.
+
+  - artifact_id: adabn_batch_stats_39_cell_best_pd
+    root: results/adabn/adabn_checkpoint_axis_v2/best_pd
+    artifact_role: normalization_foreground_expansion_best_pd_failure_control
+    identity:
+      mode: sealed_manifest_chain
+      expected_sha256: 3fd62cc6f913b1647e58178c2b95419d0a0130497fe361d0684ed8fc1b3a4c61
+      exact_tree: true
+      seals:
+        - manifest: artifact_manifest.json
+          manifest_sha256: fc2bdefab15e387c2157effdbf5ed4146d77ee7cca6ff0397a135ae9a7589ea3
+          completion: COMPLETE.json
+          completion_sha256: a81ad4927705fc8bde6a0dd073b4c5782171ede06049a98129a734c264359d10
+    artifact_complete: true
+    formal_protocol_complete: true
+    scientific_eligibility:
+      tier: development_test_selected
+      main_paper_table: false
+      reason_codes:
+        - source_checkpoint_test_selected
+    selection:
+      source_checkpoint_role: best_pd
+      checkpoint_selection_split: test
+      tta_calibration_split: none
+      test_used_for_checkpoint_selection: true
+      test_used_for_tta_selection: false
+    notes: Complete 3-dataset x 13-condition AdaBN failure-control benchmark with no additional best_pd tuning; development-only because the source checkpoint was selected on test.

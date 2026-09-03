@@ -1,0 +1,225 @@
+schema_version: 1
+protocol_id: cr-sitta-development-best-pd-axis-v1
+created_at: "2026-09-01"
+
+scope:
+  checkpoint_selection_split: test
+  test_selected: true
+  development_only: true
+  scientific_eligibility_tier: development_test_selected
+  main_paper_table: false
+  disclosure: >-
+    Both checkpoint roles were selected by repeated evaluation of the fixed
+    test split during epochs 500-1000.  This axis is development evidence and
+    is not an untouched-test estimate.
+
+training_protocol:
+  path: configs/retrain_fixed_splits.yaml
+  sha256: 17a194da4a09972906c24ac7bb25d2dd14b0d6fc67ceb1d7b8aff99f1b43c515
+  protocol_id: nsfpn-fixed-train-test-1000e-v1
+
+calibration_reuse:
+  source_checkpoint_role: best_miou
+  extra_best_pd_tuning_episodes: 0
+
+threshold:
+  transform: sigmoid
+  rule: strict_greater_than
+  value: 0.5
+
+conditions:
+  count_per_dataset: 13
+  ordered_severities: [1, 3, 5]
+
+output_roots:
+  clean: results/baseline_checkpoint_axis_v2
+  source: results/source_corruption_checkpoint_axis_v2
+  adabn: results/adabn/adabn_checkpoint_axis_v2
+
+parity_gate:
+  required_before_best_pd: true
+  receipt_schema_version: 1
+  checkpoint_role: best_miou
+  status: pending_runtime_receipt
+  required_receipt_type: checkpoint_axis_v2_best_miou_exact_parity
+  required_artifact_contract: cr-sitta-checkpoint-axis-parity-v1
+  required_runtime_status: passed
+  required_runtime_passed: true
+  receipt_path: results/checkpoint_axis_v2_parity/best_miou/PARITY_RECEIPT.json
+  candidate_roots:
+    clean: results/checkpoint_axis_v2_parity_candidates/best_miou/clean
+    source: results/checkpoint_axis_v2_parity_candidates/best_miou/source
+    adabn: results/checkpoint_axis_v2_parity_candidates/best_miou/adabn
+  references:
+    clean:
+      IRSTD-1K:
+        root: results/baseline/IRSTD-1K/best_miou
+        tree_algorithm: sorted-relative-path-tab-sha256-size-lf-v1
+        tree_file_count: 424
+        tree_sha256: 2a134198e38ab42209318d2e46f48cfbf69a05d463aaa0683ef003fb6de86fe2
+        metrics_sha256: 51b578111f3bc5edba0a1cf11c516700a47ba2d9586b790a67f64f457c45865e
+        per_image_sha256: a2a17afc73745afed5fb4436211248e0fb5b9e0e767f789b910bb0a6e8f9c8eb
+      NUAA-SIRST:
+        root: results/baseline/NUAA-SIRST/best_miou
+        tree_algorithm: sorted-relative-path-tab-sha256-size-lf-v1
+        tree_file_count: 450
+        tree_sha256: e86b84f4cb559fa807cbe4fc9bed51906c184fc84c8e9c84573cb1543ca1e0d3
+        metrics_sha256: 3c85a71d5798f0fcc87cbf992ff0b486322ab442c45912cbffdeb2f1bac323fa
+        per_image_sha256: 8b76148c2a3f2d6087d4d5ab1700cce722417438ef4cc274ce11191bd7bc79f3
+      NUDT-SIRST:
+        root: results/baseline/NUDT-SIRST/best_miou
+        tree_algorithm: sorted-relative-path-tab-sha256-size-lf-v1
+        tree_file_count: 1350
+        tree_sha256: b30404eebe6e69fe74c98ab2aef80ae1112ed5838df1ab6be5722204c06915e4
+        metrics_sha256: 18358e8154beddeb9431267b0bc655ac4dc7c1c2c6a5689f4d87dfad931f395a
+        per_image_sha256: 7f4bd072484e411eb9f3f0628f2c44fa997145f222aa23b61166bf2d007168eb
+    source:
+      IRSTD-1K:
+        root: results/source_corruption_benchmark_fixed_split_v1/IRSTD-1K/best_miou
+        tree_algorithm: sorted-relative-path-tab-sha256-size-lf-v1
+        tree_file_count: 2655
+        tree_sha256: 609b48bb78a885dd8d22ca758cd677e2ec8ceeed43e89e43dbc4440e1ed32052
+        summary_file: benchmark.json
+        summary_sha256: 64642595179427334ff3ed31d52d56023788db8f103fc31c46c23c8c50ab5c1e
+        artifact_manifest_sha256: 2b9b2fea0677af9678e2926fd1badd07a8645c3452f0ba41fea0d41cab793348
+        complete_sha256: a64dc325757317a271771641a80fb419e554dbf1239a3fe1eb939b98244c750c
+      NUAA-SIRST:
+        root: results/source_corruption_benchmark_fixed_split_v1/NUAA-SIRST/best_miou
+        tree_algorithm: sorted-relative-path-tab-sha256-size-lf-v1
+        tree_file_count: 2824
+        tree_sha256: 603ba1b48c82ef6d55c909eebd682b8d0671c647f1a270b3a734311462b16e19
+        summary_file: benchmark.json
+        summary_sha256: 5be6ca235c57215529e580129c0275a01f2d0e95a3b7d44c1362f635d965284f
+        artifact_manifest_sha256: 996092775172aace9fd885edc11a7941c912c6370eab5e305fd49e9731eaf0b1
+        complete_sha256: d525959c3c38070d8ddb966d5926b82e9df4c0c706e9e3fa671e44e08a04c45b
+      NUDT-SIRST:
+        root: results/source_corruption_benchmark_fixed_split_v1/NUDT-SIRST/best_miou
+        tree_algorithm: sorted-relative-path-tab-sha256-size-lf-v1
+        tree_file_count: 8674
+        tree_sha256: 39ac4296eead821a77a6a100b6517f70c4b9fef71a196c69b3bea79d69c321a6
+        summary_file: benchmark.json
+        summary_sha256: 9ea072ee1fb0a3827f2cdd18a645cd1981d7c26d3d9bc13db07fabbb357322e1
+        artifact_manifest_sha256: 9dfaa853ccb39f6c20bc339f1281d8f2ead0de0dcef5a5882fd62fc4ec090176
+        complete_sha256: bd8db1f59d938264d1c06e9e9f13811bd132e290449bb6bade5319bc890be65c
+    adabn:
+      root: results/adabn/adabn_batch_stats_v1
+      aggregate_metrics_file: global_index/aggregate_metrics.json
+      aggregate_metrics_sha256: 8b9304cdf8b30d15c6686a933dd0a1c1552b7371dea53a5d519049f4ae20215c
+      artifact_manifest_file: global_index/artifact_manifest.json
+      artifact_manifest_sha256: c478fd505c4cb8bc568e308fca09f04cc4a992e48d9b43ee07d5170b692a1d83
+      complete_file: COMPLETE.json
+      complete_sha256: a5b86ca406b510c3a1ced594b09ab6972e05f9246c9c0b643b3593da4bed81a2
+      datasets:
+        IRSTD-1K:
+          tree_file_count: 2735
+          tree_sha256: da69b3fe00a3c81d319516de69b36e1f8f262c248137df053f362959ce8c7351
+        NUAA-SIRST:
+          tree_file_count: 2904
+          tree_sha256: be20671502cc16721edbbea5c0ed2a1dcf647e248fcd69f13f7324dbce0768bc
+        NUDT-SIRST:
+          tree_file_count: 8754
+          tree_sha256: 4d2a983a81bd0d43d1c389dec20bf949b1666b76ef1e25b0936eef13d4c28586
+
+datasets:
+  IRSTD-1K:
+    root: datasets/IRSTD-1K
+    test_split: datasets/IRSTD-1K/img_idx/test_IRSTD-1K.txt
+    test_split_sha256: 8c71e474358acb84f2cbebfd1282ffea236f9cb852b7f7c04feb2fd99804c579
+    test_images: 201
+    image_size: 256
+  NUAA-SIRST:
+    root: datasets/NUAA-SIRST
+    test_split: datasets/NUAA-SIRST/img_idx/test_NUAA-SIRST.txt
+    test_split_sha256: e49023203a323c247306b314f23c8b3b917093a26984067792355adff7a8386e
+    test_images: 214
+    image_size: 256
+  NUDT-SIRST:
+    root: datasets/NUDT-SIRST
+    test_split: datasets/NUDT-SIRST/img_idx/test_NUDT-SIRST.txt
+    test_split_sha256: a463c52ee64b1c803c4a322fe090aaf6bc360844898e3943bb7c64a8e551b86e
+    test_images: 664
+    image_size: 256
+
+parity_anchor:
+  checkpoint_role: best_miou
+  expected_selection_metric: miou
+  expected_selection_rule: maximize_miou_then_pd_then_minimize_fa
+  checkpoints:
+    IRSTD-1K:
+      path: results/retraining_fixed_split/IRSTD-1K/best_miou.pth.tar
+      sha256: ee8d5c3af67d7c93ff6be25b169bd8fd59afcd776afd173b4e230ad8dc8aa8b2
+      epoch: 535
+      selection_value: 0.6870056497175141
+      recorded_test_metrics:
+        duration_seconds: 15.591438005911186
+        epoch: 535
+        fa_per_pixel_x1e6: 10.703926655783583
+        images: 201
+        miou: 0.6870056497175141
+        pd: 0.9319727891156463
+    NUAA-SIRST:
+      path: results/retraining_fixed_split/NUAA-SIRST/best_miou.pth.tar
+      sha256: 23feea50a847cdfc9874fe67d338a3884d9afa75d7a27b9b71a62ff2d00379cf
+      epoch: 981
+      selection_value: 0.7097310208744418
+      recorded_test_metrics:
+        duration_seconds: 18.04073079000227
+        epoch: 981
+        fa_per_pixel_x1e6: 25.668990946261683
+        images: 214
+        miou: 0.7097310208744418
+        pd: 0.9581749049429658
+    NUDT-SIRST:
+      path: results/retraining_fixed_split/NUDT-SIRST/best_miou.pth.tar
+      sha256: a67d3a7e2597d201e1fecf32b7f218aefa8274ad0443d2726197d84f44d1343e
+      epoch: 812
+      selection_value: 0.8021570182394925
+      recorded_test_metrics:
+        duration_seconds: 47.396090677939355
+        epoch: 812
+        fa_per_pixel_x1e6: 18.912625600056476
+        images: 664
+        miou: 0.8021570182394925
+        pd: 0.9767195767195768
+
+development_axis:
+  checkpoint_role: best_pd
+  expected_selection_metric: pd
+  expected_selection_rule: maximize_pd_then_minimize_fa_then_miou
+  checkpoints:
+    IRSTD-1K:
+      path: results/retraining_fixed_split/IRSTD-1K/best_pd.pth.tar
+      sha256: 13d523b938072aeeb7e26394cae73778f18cedb422124bf8f218bdaee803967d
+      epoch: 567
+      selection_value: 0.9523809523809523
+      recorded_test_metrics:
+        duration_seconds: 15.808821805985644
+        epoch: 567
+        fa_per_pixel_x1e6: 17.30847714552239
+        images: 201
+        miou: 0.6715891558298435
+        pd: 0.9523809523809523
+    NUAA-SIRST:
+      path: results/retraining_fixed_split/NUAA-SIRST/best_pd.pth.tar
+      sha256: 4882f405feebf66e34e6832aadaea19fbad38459f2afedfe3fc261dd75f02286
+      epoch: 504
+      selection_value: 0.9809885931558935
+      recorded_test_metrics:
+        duration_seconds: 16.15951175498776
+        epoch: 504
+        fa_per_pixel_x1e6: 46.70330297167056
+        images: 214
+        miou: 0.6929541678882049
+        pd: 0.9809885931558935
+    NUDT-SIRST:
+      path: results/retraining_fixed_split/NUDT-SIRST/best_pd.pth.tar
+      sha256: 3a381ef8c561989f14b03f4df704e487f76f1cc639cdab2cc1de54f1b75c144e
+      epoch: 783
+      selection_value: 0.982010582010582
+      recorded_test_metrics:
+        duration_seconds: 48.535631851060316
+        epoch: 783
+        fa_per_pixel_x1e6: 24.106129106268828
+        images: 664
+        miou: 0.7906652194138626
+        pd: 0.982010582010582

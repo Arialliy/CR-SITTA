@@ -22,12 +22,12 @@ restores the complete Source state before the next image.
 > than an untouched-test main-paper benchmark. Under the frozen protocol, TTA
 > parameters must be calibrated once on a fixed train-side Pilot with
 > `best_miou` and then reused unchanged for `best_pd`. See
-> [results/README.md](results/README.md) and the external
-> eligibility rules in
+> [results/README.md](results/README.md) and the append-only eligibility rules
+> in [configs/artifact_eligibility_registry_v2.yaml](configs/artifact_eligibility_registry_v2.yaml),
+> whose immutable parent is
 > [configs/artifact_eligibility_registry_v1.yaml](configs/artifact_eligibility_registry_v1.yaml).
-> Run `./.conda/bin/python scripts/validate_result_eligibility.py materialize`
-> to materialize the ignored local registry at
-> `results/artifact_eligibility_registry_v1.json`.
+> Run `./.conda/bin/python scripts/validate_result_eligibility_v2.py materialize`
+> to materialize the ignored local v2 registry.
 
 ## Current scope
 
@@ -36,7 +36,8 @@ restores the complete Source state before the next image.
 | Frozen protocol, upstream Source reproduction, unified evaluator, and deterministic corruptions | Completed and archived in [CR_SITTA_STEPS_0_3.md](CR_SITTA_STEPS_0_3.md) |
 | Fixed-split NS-FPN training and clean/13-condition Source benchmark on IRSTD-1K, NUAA-SIRST, and NUDT-SIRST | Implemented |
 | Single-image episodic state/reset framework and AdaBN | Implemented, including the formal 3-dataset × 13-condition runner |
-| Binary Episodic TENT | Stage 1 engineering protocol completed, but the scientific utility gate failed; Stage 2/3 are hard-blocked, TENT-SS is retained as a negative baseline, and the source-train-only D0 diagnostic runner is implemented but has not yet published formal GPU results |
+| Binary Episodic TENT | Stage 1 engineering protocol and the source-train-only D0-v3 formal Stage-A diagnosis are complete. All 10 candidates failed the frozen utility gate (0/10 eligible), so R1/R2 and Stage 2/3 are hard-blocked and the all-BN entropy-update route is retained only as negative evidence |
+| Non-adaptive multi-view teacher (P4) | The local source-train Pilot64 screen is complete across 3 datasets × 13 conditions. All 10 candidates failed the frozen utility gate (0/10 eligible); the best candidate reached non-clean macro ΔIoU +0.000722, below the required >+0.001. P5 remains unauthorized |
 | Full CR-SITTA | Not implemented yet |
 
 The untouched historical v2 runner is preserved only as a non-authorizing
@@ -102,6 +103,10 @@ cp configs/local_paths.example.yaml configs/local_paths.yaml
 Formal runners use the versioned contracts under `configs/`, fail closed when
 hashes or protocols drift, and refuse to overwrite completed artifacts. The
 generated artifact layout is documented in [results/README.md](results/README.md).
+The archived P4 v1 run also binds a locally retained decision-provenance memo
+and ignored predecessor receipts. Its public code and computational contract
+are inspectable here, but exact verification of that historical artifact is
+not self-contained in a fresh clone.
 
 ## Verification
 
@@ -118,13 +123,18 @@ With the frozen local inputs in place:
   --root /path/to/IRSTD-1K \
   --device cuda:0
 
+# Default: portable tests that do not require ignored local research artifacts.
 ./.conda/bin/python -m pytest -q
+
+# Opt in to tests that verify this machine's ignored research artifacts.
+NS_FPN_RUN_LOCAL_ARTIFACT_TESTS=1 ./.conda/bin/python -m pytest -q
 ```
 
-The full suite includes fail-closed real-contract integration tests. A fresh
-clone must be populated with the ignored datasets, checkpoints, and pinned
-intermediate artifacts before those tests can pass; pure unit tests do not
-require the local research artifacts.
+The opt-in integration tests require the ignored datasets and checkpoints,
+materialized caches, engineering-smoke/parity/eligibility receipts under
+`results/`, and the project-local compiled SFS extension under `.conda/`.
+Populate and verify those inputs before setting
+`NS_FPN_RUN_LOCAL_ARTIFACT_TESTS=1`; the default test command skips them.
 
 ## Fixed-split benchmark
 
