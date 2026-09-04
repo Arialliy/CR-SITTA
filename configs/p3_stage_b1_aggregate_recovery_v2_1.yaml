@@ -1,0 +1,92 @@
+schema_version: 1
+protocol_id: cr-sitta-p3-stage-b1-aggregate-recovery-v2.1
+role: aggregate_only_erratum_recovery
+
+parent_stage_b1_v2:
+  protocol_id: cr-sitta-p3-stage-b1-gradient-decomposition-v2
+  config_path: configs/p3_stage_b_gradient_decomposition_v2.yaml
+  config_sha256: b758776dcc92de6de1c43aacf615a89d93961278d17800e7d9f583ab8d436461
+  config_canonical_mapping_sha256: 04c8daef542b29193808037a6441c38acb20217edf1eb7568e1be9de89d86c66
+  cell_output_root: results/cr_sitta/p3_stage_b_gradient_decomposition_v2
+  cell_count: 39
+  episodes_per_cell: 64
+  episode_count: 2496
+  cell_code_seal_bundle_sha256: 18e61417dae904bf823356ca690db43f5fa3d2fafa0ef75007754d694843adda
+  cell_code_seal_file_count: 27
+  cell_manifest_complete_ledger:
+    base: parent_stage_b1_v2.cell_output_root
+    member_names: [COMPLETE.json, manifest.json]
+    path_format: output_root_relative_posix
+    row_schema: [path, sha256]
+    ordering: lexicographic_by_path
+    serialization: canonical_json_without_trailing_newline
+    file_count: 78
+    sha256: 514a58a1198c969cb86b387c257978294e7aeb62c9ddc978d17ccd4f5c2169bc
+  failed_aggregate_code_seal_bundle_sha256: 7d3e155c0d0c5c4ee1c52e5501e96d0e3b42a7c1e87c2e3e334f02a77b57a7c4
+
+repair:
+  failure_class: immutable_container_adapter_type_mismatch
+  exception_message: frozen mechanism gate semantics differ
+  original_command: >-
+    CUDA_VISIBLE_DEVICES= PYTHONDONTWRITEBYTECODE=1 ./.conda/bin/python
+    scripts/run_p3_stage_b_gradient_decomposition_v2.py --config
+    configs/p3_stage_b_gradient_decomposition_v2.yaml aggregate
+  original_exit_code: 1
+  mismatch_fields:
+    - support_accounting.required_count_fields.per_cell
+    - support_accounting.required_count_fields.per_joint_cell
+    - support_accounting.required_count_fields.per_stratum
+    - support_accounting.required_count_fields.per_joint_stratum
+  producer_container_type: tuple
+  delegated_checker_expected_container_type: list
+  allowed_adapter: recursive_mapping_to_dict_and_tuple_or_list_to_list
+  adapter_scope: mechanism_evidence_flags_only
+  canonical_semantic_hash_algorithm: sha256_of_canonical_json
+  require_semantic_hash_equality: true
+  thresholds_changed: false
+  coverage_changed: false
+  data_changed: false
+  statistics_changed: false
+  scientific_status_before_recovery: not_evaluated
+
+related_code_sha256:
+  parent_contract: f304effb541d08bc1b24d8aceefc28f0868088641da41ab87d8ddad15b0a85c5
+  parent_aggregate_v1: f7d38b7b3a66f00c69f7e2eb8dae3bf38246053a2105441d639affefc7ad7dd7
+  parent_aggregate_v2: 86bb3584924d2b6a8943e756fd36309efd286fd3875fbce6168a410e563ceea3
+  parent_runner_v2: 07e9f7ef39e3b6a1f4036948df8456c21d7f796afc52301ccab873c4338ac8b4
+
+execution:
+  device: cpu
+  cuda_initialized: forbidden
+  validation_payload_access: forbidden
+  test_payload_access: forbidden
+  raw_image_access: forbidden
+  raw_target_access: forbidden
+  optimizer_construction: forbidden
+  model_construction: forbidden
+  candidate_selection: forbidden
+  stage_b3_authorized: false
+  p5_authorized: false
+
+output:
+  root: results/cr_sitta/p3_stage_b1_aggregate_recovery_v2_1
+  incident_relative_path: AGGREGATE_PREPUBLICATION_FAILURE.json
+  aggregate_relative_path: aggregate_phase_v2_1/R0
+  atomic_no_replace: true
+  immutable: true
+
+implementation:
+  critical_code_paths:
+    - analysis/p3_stage_b1_aggregate_recovery_v2_1.py
+    - scripts/run_p3_stage_b1_aggregate_recovery_v2_1.py
+    - analysis/p3_stage_b1_aggregate_v2.py
+    - analysis/p3_stage_b1_aggregate.py
+    - analysis/p3_stage_b1_outer_cell_shard_v2.py
+    - analysis/p3_stage_b1_outer_cell_shard.py
+    - analysis/foreground_background_gradient_decomposition_v2.py
+    - analysis/foreground_background_gradient_decomposition_v1.py
+    - analysis/p3_stage_b1_contract_v2.py
+    - analysis/d0_v3_label_free_shard.py
+    - tta/d0_secure_io.py
+    - tta/d0_v3_atomic_shard.py
+  path_order_is_frozen: true

@@ -1,0 +1,305 @@
+schema_version: 1
+protocol_id: cr-sitta-p3-stage-b3-objective-space-screen-v1
+created_at: "2026-09-03"
+
+scope:
+  stage: P3_stage_b3_objective_parameter_space_screen
+  source_train_derived: true
+  split_name: train
+  split_role: frozen_hash_selected_pilot16_from_pilot64
+  image_count_per_condition: 16
+  dataset_count: 3
+  condition_count_per_dataset: 13
+  replicate_ids: [R0]
+  seed: 42
+  development_only: true
+  paper_result: false
+  paper_test_result: false
+  use_validation_payload: false
+  use_test_payload: false
+  method_label_accesses: 0
+  adaptation_gradient_uses_labels: false
+  outer_train_target_access_after_candidate_completion_only: true
+
+stage_transition:
+  stage_b1_protocol_complete: true
+  stage_b1_role: mechanism_diagnostic_not_candidate_gate
+  stage_b1_does_not_authorize_or_block_b3: true
+  stage_b2_protocol_complete: true
+  stage_b2_scientific_status: scientific_no_eligible
+  teacher_not_claimed_better_than_source: true
+  detached_teacher_uncertainty_reuse_allowed: true
+  stage_b3_authorized_by_frozen_v5_design: true
+  stage_b4_allowed_before_b3_gate: false
+
+frozen_parent_bindings:
+  design_document:
+    path: CR-SITTA_P3_StageA负结果后的StageB方案与代码修改_v5.md
+    sha256: 88be0c810e47f9bc3c494555421718d9b4166f3b5d13903cae515cfc7f01c91d
+  train_pilot_protocol:
+    path: configs/tta_train_side_calibration_pilot_v2.yaml
+    sha256: 3a35f2107786815ef8e7b053e1c220406f9bf2d095f59bccdc5822e16be9ab96
+  cache_protocol:
+    path: configs/binary_tent_ss_calibration_cache_v2.yaml
+    sha256: e225311cce252125eaf3a2b47eeeea4cde60d0363c8c71f48494d70e41c2aa3e
+  severity_table:
+    path: corruptions/severity_tables.yaml
+    sha256: c3218738fd32f2cfa2a24731456d9dc18fa648eb7b0b6e1fbd5175c605ba0536
+  view_library:
+    path: configs/irstd_view_library_v1.yaml
+    sha256: ce88436788036ae5d59ffbf2605135ecd9848044816ff3db8ffc603e9669f2d5
+  stage_b1_complete:
+    path: results/cr_sitta/p3_stage_b1_aggregate_recovery_v2_1/aggregate_phase_v2_1/R0/COMPLETE.json
+    sha256: 0d35be69d56059614ce42e7c2cfc2e9b70612f092ffbe459ace93f7337c17c65
+  stage_b1_manifest:
+    path: results/cr_sitta/p3_stage_b1_aggregate_recovery_v2_1/aggregate_phase_v2_1/R0/manifest.json
+    sha256: 2e1d63fb20ace0931ea1cd94220ba278b53db8f3a047e234a5f2aa3017551283
+  stage_b1_mechanism_evidence:
+    path: results/cr_sitta/p3_stage_b1_aggregate_recovery_v2_1/aggregate_phase_v2_1/R0/mechanism_evidence_flags.json
+    sha256: cf81705cc11aff3dd6b636565218171ae83372623a1faafa068edb67123e47ff
+  stage_b2_config:
+    path: configs/nonadaptive_teacher_screen_v1.yaml
+    sha256: cd2ecd53afaaf4215d496e227537481310027af2d99e069eb24c468ad4075099
+  stage_b2_complete:
+    path: results/cr_sitta/nonadaptive_teacher_screen_v1/aggregate_phase/R0/COMPLETE.json
+    sha256: 151fea18ce49b4cfd093267d06f767bacb1e0e59a735cac99bd24e4b1567dba1
+  stage_b2_manifest:
+    path: results/cr_sitta/nonadaptive_teacher_screen_v1/aggregate_phase/R0/manifest.json
+    sha256: 660a46e8213b413f7b35cfaa4848ac6cca2cf44bf6b7e7e97f1679bf6799d2e0
+  stage_b2_science_decision:
+    path: results/cr_sitta/nonadaptive_teacher_screen_v1/aggregate_phase/R0/science_decision_receipt.json
+    sha256: 79fde953e575f5719cae1bdbc46b1efd7c4d315be733cd2104bdd6dc172dbec4
+
+datasets:
+  IRSTD-1K:
+    checkpoint_role: best_miou
+    checkpoint_path: results/retraining_fixed_split/IRSTD-1K/best_miou.pth.tar
+    checkpoint_sha256: ee8d5c3af67d7c93ff6be25b169bd8fd59afcd776afd173b4e230ad8dc8aa8b2
+    train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+    cache_root: results/binary_tent/ss_calibration_cache_v2/IRSTD-1K
+    cache_manifest_sha256: 95d0ee45ccf2f221eea042f96c3bfd3e25dcc736286482ad21f2591176651db6
+    cache_content_sha256: f3ff4c7b60d53ac1ec553a1b35f6a947be6e2da264a893ef4dff2cce513774c1
+    teacher_artifact_root: results/cr_sitta/nonadaptive_teacher_screen_v1/candidate_phase/IRSTD-1K
+    teacher_manifest_sha256: 42aa8ffbb85a53b57851a69e1a1c8c2094f202833532917ff7e01158fbfcc1fd
+    teacher_complete_sha256: 63f401faa207045183728763348058a4aab185cd9a6f77a46b7cebd1c4ed2148
+    selected_image_ids: [XDU126, XDU942, XDU386, XDU69, XDU224, XDU145, XDU906, XDU821, XDU186, XDU481, XDU407, XDU779, XDU754, XDU202, XDU553, XDU628]
+    selected_image_ids_sha256: ed208ee6a645749e41c2531daf0001a47b078329a58fb8651846ae4c471c3146
+  NUAA-SIRST:
+    checkpoint_role: best_miou
+    checkpoint_path: results/retraining_fixed_split/NUAA-SIRST/best_miou.pth.tar
+    checkpoint_sha256: 23feea50a847cdfc9874fe67d338a3884d9afa75d7a27b9b71a62ff2d00379cf
+    train_split_sha256: 324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4
+    cache_root: results/binary_tent/ss_calibration_cache_v2/NUAA-SIRST
+    cache_manifest_sha256: aef94b27929a80cf8b05174862cc688d844a9016867cbee0c9751f105229a76d
+    cache_content_sha256: 0606f8e0f420ad2e268b3dc873e4966b1ab9f2569d85115cfa1dd5863dfc0d12
+    teacher_artifact_root: results/cr_sitta/nonadaptive_teacher_screen_v1/candidate_phase/NUAA-SIRST
+    teacher_manifest_sha256: b360567e6d6546d0da998c251a74e7255e19fa6d513bf7ee81dec92ab92bc101
+    teacher_complete_sha256: 6e9a915ddcbf26f21d83b161b8735c61651c885301337f99341f2d35b46fcf6b
+    selected_image_ids: [Misc_180, Misc_90, Misc_232, Misc_421, Misc_424, Misc_118, Misc_50, Misc_11, Misc_77, Misc_401, Misc_352, Misc_201, Misc_213, Misc_391, Misc_211, Misc_214]
+    selected_image_ids_sha256: e98558c0707e5384ac4040e4f28d7c4642b2dc93f17c667ac4c60a5b565c9cff
+  NUDT-SIRST:
+    checkpoint_role: best_miou
+    checkpoint_path: results/retraining_fixed_split/NUDT-SIRST/best_miou.pth.tar
+    checkpoint_sha256: a67d3a7e2597d201e1fecf32b7f218aefa8274ad0443d2726197d84f44d1343e
+    train_split_sha256: e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3
+    cache_root: results/binary_tent/ss_calibration_cache_v2/NUDT-SIRST
+    cache_manifest_sha256: bc9ac2caee9647365f58cf21fea30558295889adbb68b8c560779bcc73959e25
+    cache_content_sha256: 3e9ed0cac6bc5e7257d0d5106c85352c783f302c4e949bd802ec1d5e707740d9
+    teacher_artifact_root: results/cr_sitta/nonadaptive_teacher_screen_v1/candidate_phase/NUDT-SIRST
+    teacher_manifest_sha256: a64f2a88fcd9e0c22640795c18a7c4ae360b767f0713714ec92bb41d566a6e0e
+    teacher_complete_sha256: f2c67f16050268f75cdce2f770a38109956b332a85d8e1ee962370492d78c63b
+    selected_image_ids: ['000265', '000078', '000277', '000103', '000777', '001310', '001015', '000641', '000246', '001270', '001323', '000241', '000534', '001016', '000181', '000891']
+    selected_image_ids_sha256: 431295a64307730c8b47e8b1a56ba17893769bebe90e535be80de0d51fefdd0d
+
+ordered_conditions:
+  - [clean, 0]
+  - [gaussian_noise, 1]
+  - [gaussian_noise, 3]
+  - [gaussian_noise, 5]
+  - [gaussian_blur, 1]
+  - [gaussian_blur, 3]
+  - [gaussian_blur, 5]
+  - [low_contrast, 1]
+  - [low_contrast, 3]
+  - [low_contrast, 5]
+  - [stripe_noise, 1]
+  - [stripe_noise, 3]
+  - [stripe_noise, 5]
+
+pilot16_selection:
+  source_count: 64
+  selected_count: 16
+  algorithm: "sort ascending by sha256('cr-sitta-stage-b3-v1\\0' + dataset + '\\0' + image_id), then take first 16"
+  label_or_metric_used: false
+  order_after_selection: hash_rank_order
+
+teacher:
+  artifact_protocol_id: cr-sitta-nonadaptive-teacher-screen-v1
+  probability_role: sealed_source_identity
+  probability_array: source_probabilities
+  b2_candidate_selected: false
+  b2_relative_best_used_as_pseudo_target: false
+  uncertainty_view_set: flip4
+  uncertainty_axis_index: 0
+  detached_required: true
+  source_identity_cross_check_required: true
+  teacher_scientific_eligibility_claimed: false
+
+view_library:
+  config_path: configs/irstd_view_library_v1.yaml
+  student_perturbation: mild_contrast_0p95
+
+objectives:
+  entropy_eps: 1.0e-6
+  probability_eps: 1.0e-6
+  foreground_background_separately_normalized: true
+  O0:
+    name: global_binary_entropy_negative_control
+  O1:
+    name: foreground_background_balanced_entropy
+    lambda_foreground: 1.0
+    lambda_background: 1.0
+  O2:
+    name: source_anchored_region_balanced_multiview_consistency
+    lambda_foreground: 1.0
+    lambda_background: 1.0
+  O3:
+    name: O2_plus_foreground_soft_dice_and_background_soft_bce
+    lambda_multiview: 1.0
+    lambda_foreground: 1.0
+    lambda_background: 1.0
+  O4:
+    name: O3_plus_foreground_mass_guard
+    lambda_multiview: 1.0
+    lambda_foreground: 1.0
+    lambda_background: 1.0
+    lambda_mass: 5.0
+    mass_margin: 0.0001
+  O5:
+    status: deferred_not_silently_substituted
+    reason: no independently validated source feature summary usable by both P2 and FiLM
+
+parameter_spaces:
+  P2:
+    type: bn_affine
+    group_spec: decoder_low
+    expected_parameter_tensor_count: 16
+    expected_scalar_parameter_count: 416
+    step_normalization: relative_to_source_parameter_l2
+    trust_radius: 0.0005
+  DecoderFiLM:
+    type: external_decoder0_film
+    channels: 16
+    max_scale_delta: 0.05
+    max_bias: 0.05
+    expected_parameter_tensor_count: 2
+    expected_scalar_parameter_count: 32
+    step_normalization: absolute_l2
+    trust_radius: 0.25
+
+candidates:
+  - {id: O0_P2, objective: O0, parameter_space: P2, role: negative_control}
+  - {id: O0_DecoderFiLM, objective: O0, parameter_space: DecoderFiLM, role: negative_control}
+  - {id: O1_P2, objective: O1, parameter_space: P2, role: screen}
+  - {id: O1_DecoderFiLM, objective: O1, parameter_space: DecoderFiLM, role: screen}
+  - {id: O2_P2, objective: O2, parameter_space: P2, role: screen}
+  - {id: O2_DecoderFiLM, objective: O2, parameter_space: DecoderFiLM, role: screen}
+  - {id: O3_P2, objective: O3, parameter_space: P2, role: screen}
+  - {id: O3_DecoderFiLM, objective: O3, parameter_space: DecoderFiLM, role: screen}
+  - {id: O4_P2, objective: O4, parameter_space: P2, role: screen}
+  - {id: O4_DecoderFiLM, objective: O4, parameter_space: DecoderFiLM, role: screen}
+
+outer_oracle_task_loss:
+  role: train_only_outer_evaluator_gradient_alignment
+  used_by_adaptation: false
+  lambda_bce: 1.0
+  lambda_soft_iou: 1.0
+  eps: 1.0e-6
+  bce_reduction: mean_over_all_pixels
+  soft_iou_reduction: mean_over_sample
+  empty_target_convention: epsilon_smoothed_union_penalizes_foreground
+
+evaluation:
+  probability_threshold: 0.5
+  threshold_rule: strict_greater_than
+  foreground_connectivity_2d: 8
+  min_component_area: 1
+  max_centroid_distance_pixels: 3.0
+
+stage_b3_gate:
+  comparison_tolerance: 1.0e-12
+  maximum_selected_candidates: 4
+  normalized_task_directional_derivative_maximum: 0.0
+  minimum_negative_derivative_datasets: 2
+  minimum_negative_derivative_families: 3
+  minimum_negative_derivative_severities: 2
+  nonclean_macro_delta_iou_strictly_greater_than: 0.0
+  clean_macro_delta_iou_minimum: -0.005
+  foreground_fraction_delta_maximum: 0.001
+  foreground_fraction_source_multiplier: 1.2
+  foreground_fraction_epsilon: 1.0e-6
+  minimum_functional_changed_episodes: 1
+  minimum_threshold_crossing_count: 1
+  minimum_positive_delta_iou_severities: 2
+  filter_before_ranking: true
+  no_eligible_is_normal_scientific_result: true
+  negative_controls_selectable: false
+
+implementation:
+  critical_code_paths:
+    - scripts/run_p3_stage_b_screen_v1.py
+    - analysis/proxy_objective_space_screen_v1.py
+    - tta/views/__init__.py
+    - tta/views/irstd_views.py
+    - tta/__init__.py
+    - tta/adabn.py
+    - tta/episodic_runner.py
+    - tta/objectives/__init__.py
+    - tta/objectives/_validation.py
+    - tta/objectives/balanced_entropy.py
+    - tta/objectives/region_balanced_consistency.py
+    - tta/objectives/soft_iou_anchor.py
+    - tta/objectives/foreground_mass_guard.py
+    - tta/objectives/feature_statistics.py
+    - tta/objectives/parameter_anchor.py
+    - tta/adapters/__init__.py
+    - tta/adapters/decoder_film.py
+    - tta/adapters/decoder_hook.py
+    - tta/adapters/low_rank_feature_mixer.py
+    - tta/parameter_groups.py
+    - tta/proposal_step.py
+    - tta/model_adapter.py
+    - tta/state_manager.py
+    - tta/d0_secure_io.py
+    - analysis/d0_v2_task_loss.py
+    - analysis/source_train_provenance.py
+    - materialize_binary_tent_ss_calibration_cache_v2.py
+    - dataio/train_side_pilot_protocol.py
+    - metrics/irstd_metrics.py
+    - metrics/irstd_metrics_v2.py
+    - metrics/__init__.py
+    - metrics/connected_components.py
+    - metrics/official_metric_adapter.py
+    - metrics/target_matching.py
+    - utils/metric.py
+    - model/MSHNet_NSFPN.py
+    - model/NS_FPN.py
+    - model/diff_cross_attns.py
+    - SFS_MSDeformAttn/ops/functions/ms_deform_attn_func.py
+    - SFS_MSDeformAttn/ops/modules/ms_deform_attn.py
+    - SFS_MSDeformAttn/ops/__init__.py
+    - SFS_MSDeformAttn/ops/functions/__init__.py
+    - SFS_MSDeformAttn/ops/modules/__init__.py
+    - analysis/__init__.py
+    - test_source.py
+    - environment.linux-64.explicit.txt
+
+output:
+  root: results/cr_sitta/p3_stage_b3_objective_space_screen_v1
+  candidate_phase: candidate_phase/R0
+  outer_phase: outer_phase/R0
+  aggregate_phase: aggregate_phase/R0
+  engineering_phase: engineering_dry_runs
+  atomic_no_replace: true
+  refuse_overwrite: true
+  existing_verified_complete_action: no_op

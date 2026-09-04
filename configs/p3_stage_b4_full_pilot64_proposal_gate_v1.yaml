@@ -1,0 +1,352 @@
+schema_version: 1
+protocol_id: cr-sitta-p3-stage-b4-full-pilot64-proposal-gate-v1
+created_at: "2026-09-04"
+
+scope:
+  stage: P3_stage_b4_full_pilot64_proposal_gate_R0
+  source_train_derived: true
+  split_name: train
+  split_role: frozen_pilot64
+  no_validation_split: true
+  image_count_per_condition: 64
+  dataset_count: 3
+  condition_count_per_dataset: 13
+  candidate_count: 4
+  episodes_per_candidate: 2496
+  total_candidate_episodes: 9984
+  replicate_ids: [R0]
+  seed: 42
+  development_only: true
+  paper_result: false
+  paper_test_result: false
+  use_validation_payload: false
+  use_test_payload: false
+  method_label_accesses: 0
+  adaptation_gradient_uses_labels: false
+  outer_train_target_access_after_candidate_completion_only: true
+
+stage_transition:
+  stage_b3_protocol_complete: true
+  stage_b3_scientific_status: scientific_passed
+  stage_b3_stage_b4_allowed: true
+  selected_candidate_source: frozen_stage_b3_science_decision_receipt
+  stage_b5_allowed_before_b4_gate: false
+  formal_test_allowed_by_b4: false
+
+frozen_parent_bindings:
+  design_document:
+    path: CR-SITTA_P3_StageA负结果后的StageB方案与代码修改_v5.md
+    sha256: 88be0c810e47f9bc3c494555421718d9b4166f3b5d13903cae515cfc7f01c91d
+  train_pilot_protocol:
+    path: configs/tta_train_side_calibration_pilot_v2.yaml
+    sha256: 3a35f2107786815ef8e7b053e1c220406f9bf2d095f59bccdc5822e16be9ab96
+  cache_protocol:
+    path: configs/binary_tent_ss_calibration_cache_v2.yaml
+    sha256: e225311cce252125eaf3a2b47eeeea4cde60d0363c8c71f48494d70e41c2aa3e
+  severity_table:
+    path: corruptions/severity_tables.yaml
+    sha256: c3218738fd32f2cfa2a24731456d9dc18fa648eb7b0b6e1fbd5175c605ba0536
+  view_library:
+    path: configs/irstd_view_library_v1.yaml
+    sha256: ce88436788036ae5d59ffbf2605135ecd9848044816ff3db8ffc603e9669f2d5
+  d0_v3_gate_threshold_source:
+    path: configs/tent_failure_diagnostics_v3_formal_stage_a.yaml
+    sha256: f0ed056520f840d1432b90b6426f55803afa1867b98108712dc242371dd1c05a
+  stage_b3_config:
+    path: configs/p3_stage_b_objective_space_screen_v1.yaml
+    sha256: 6a596b472e6761be17bebab6888402d6f3ef050946edb3f345a92be5f1ad7666
+  stage_b3_runner:
+    path: scripts/run_p3_stage_b_screen_v1.py
+    sha256: a52cbd7ecc411604918c1a2187b785d109deeac690ec091e901272781d485b8b
+  stage_b3_aggregate_manifest:
+    path: results/cr_sitta/p3_stage_b3_objective_space_screen_v1/aggregate_phase/R0/manifest.json
+    sha256: 7ee2e9b793c806faff26a3d13e00a2866fdade07064b7daacd85eca04e0720b5
+  stage_b3_aggregate_complete:
+    path: results/cr_sitta/p3_stage_b3_objective_space_screen_v1/aggregate_phase/R0/COMPLETE.json
+    sha256: 127f03052ea28f836490b4eb86fd667b2b346aec16f71c7c71b0aab47ba1671e
+  stage_b3_science_decision:
+    path: results/cr_sitta/p3_stage_b3_objective_space_screen_v1/aggregate_phase/R0/science_decision_receipt.json
+    sha256: 47dd8153db22bf06f9cd1477e0ac56e05dbd7ba78fb707d027679fd10af14970
+  stage_b3_summary:
+    path: results/cr_sitta/p3_stage_b3_objective_space_screen_v1/aggregate_phase/R0/summary.json
+    sha256: e5d54138e9d5f9cd657c9f0f7f56384ece9f69135fad3106177526bd3c0a43ec
+
+datasets:
+  IRSTD-1K:
+    checkpoint_role: best_miou
+    checkpoint_path: results/retraining_fixed_split/IRSTD-1K/best_miou.pth.tar
+    checkpoint_sha256: ee8d5c3af67d7c93ff6be25b169bd8fd59afcd776afd173b4e230ad8dc8aa8b2
+    train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+    ordered_pilot64_image_ids_sha256: 0ee4400c021dcfb639d813bc20582060a3fff8bb635292e48abf820ce90abb13
+    cache_root: results/binary_tent/ss_calibration_cache_v2/IRSTD-1K
+    cache_manifest_sha256: 95d0ee45ccf2f221eea042f96c3bfd3e25dcc736286482ad21f2591176651db6
+    cache_content_sha256: f3ff4c7b60d53ac1ec553a1b35f6a947be6e2da264a893ef4dff2cce513774c1
+    teacher_artifact_root: results/cr_sitta/nonadaptive_teacher_screen_v1/candidate_phase/IRSTD-1K
+    teacher_manifest_sha256: 42aa8ffbb85a53b57851a69e1a1c8c2094f202833532917ff7e01158fbfcc1fd
+    teacher_complete_sha256: 63f401faa207045183728763348058a4aab185cd9a6f77a46b7cebd1c4ed2148
+  NUAA-SIRST:
+    checkpoint_role: best_miou
+    checkpoint_path: results/retraining_fixed_split/NUAA-SIRST/best_miou.pth.tar
+    checkpoint_sha256: 23feea50a847cdfc9874fe67d338a3884d9afa75d7a27b9b71a62ff2d00379cf
+    train_split_sha256: 324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4
+    ordered_pilot64_image_ids_sha256: a48e5e3f0ec3e6911a74f953e96aa7ea362b2f2f32c37626099afd61f4935baa
+    cache_root: results/binary_tent/ss_calibration_cache_v2/NUAA-SIRST
+    cache_manifest_sha256: aef94b27929a80cf8b05174862cc688d844a9016867cbee0c9751f105229a76d
+    cache_content_sha256: 0606f8e0f420ad2e268b3dc873e4966b1ab9f2569d85115cfa1dd5863dfc0d12
+    teacher_artifact_root: results/cr_sitta/nonadaptive_teacher_screen_v1/candidate_phase/NUAA-SIRST
+    teacher_manifest_sha256: b360567e6d6546d0da998c251a74e7255e19fa6d513bf7ee81dec92ab92bc101
+    teacher_complete_sha256: 6e9a915ddcbf26f21d83b161b8735c61651c885301337f99341f2d35b46fcf6b
+  NUDT-SIRST:
+    checkpoint_role: best_miou
+    checkpoint_path: results/retraining_fixed_split/NUDT-SIRST/best_miou.pth.tar
+    checkpoint_sha256: a67d3a7e2597d201e1fecf32b7f218aefa8274ad0443d2726197d84f44d1343e
+    train_split_sha256: e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3
+    ordered_pilot64_image_ids_sha256: 5c6c8b441eab5277611fa1007354692df557db311e2d7969e34ebeaba3ae00e4
+    cache_root: results/binary_tent/ss_calibration_cache_v2/NUDT-SIRST
+    cache_manifest_sha256: bc9ac2caee9647365f58cf21fea30558295889adbb68b8c560779bcc73959e25
+    cache_content_sha256: 3e9ed0cac6bc5e7257d0d5106c85352c783f302c4e949bd802ec1d5e707740d9
+    teacher_artifact_root: results/cr_sitta/nonadaptive_teacher_screen_v1/candidate_phase/NUDT-SIRST
+    teacher_manifest_sha256: a64f2a88fcd9e0c22640795c18a7c4ae360b767f0713714ec92bb41d566a6e0e
+    teacher_complete_sha256: f2c67f16050268f75cdce2f770a38109956b332a85d8e1ee962370492d78c63b
+
+ordered_conditions:
+  - [clean, 0]
+  - [gaussian_noise, 1]
+  - [gaussian_noise, 3]
+  - [gaussian_noise, 5]
+  - [gaussian_blur, 1]
+  - [gaussian_blur, 3]
+  - [gaussian_blur, 5]
+  - [low_contrast, 1]
+  - [low_contrast, 3]
+  - [low_contrast, 5]
+  - [stripe_noise, 1]
+  - [stripe_noise, 3]
+  - [stripe_noise, 5]
+
+pilot64:
+  image_count: 64
+  order_source: frozen_nonadaptive_teacher_candidate_manifest_and_cache_manifest
+  ordered_id_hash_encoding: compact_json_utf8_without_trailing_newline
+  label_or_metric_used_for_selection: false
+
+teacher:
+  artifact_protocol_id: cr-sitta-nonadaptive-teacher-screen-v1
+  probability_role: sealed_source_identity
+  probability_array: source_probabilities
+  b2_candidate_selected: false
+  uncertainty_view_set: flip4
+  uncertainty_axis_index: 0
+  detached_required: true
+  source_identity_cross_check_required: true
+  teacher_scientific_eligibility_claimed: false
+
+view_library:
+  config_path: configs/irstd_view_library_v1.yaml
+  student_perturbation: mild_contrast_0p95
+
+objectives:
+  entropy_eps: 1.0e-6
+  probability_eps: 1.0e-6
+  foreground_background_separately_normalized: true
+  O3:
+    name: source_anchored_region_balanced_multiview_consistency_plus_foreground_soft_dice_and_background_soft_bce
+    lambda_multiview: 1.0
+    lambda_foreground: 1.0
+    lambda_background: 1.0
+  O4:
+    name: O3_plus_foreground_mass_guard
+    lambda_multiview: 1.0
+    lambda_foreground: 1.0
+    lambda_background: 1.0
+    lambda_mass: 5.0
+    mass_margin: 0.0001
+
+parameter_spaces:
+  P2:
+    type: bn_affine
+    group_spec: decoder_low
+    expected_parameter_tensor_count: 16
+    expected_scalar_parameter_count: 416
+    radius_mode: relative_to_source_parameter_l2
+    relative_radius: 0.0005
+    absolute_radius: null
+  DecoderFiLM:
+    type: external_decoder0_film
+    channels: 16
+    max_scale_delta: 0.05
+    max_bias: 0.05
+    expected_parameter_tensor_count: 2
+    expected_scalar_parameter_count: 32
+    radius_mode: absolute_l2_for_zero_initialized_adapter
+    relative_radius: null
+    absolute_radius: 0.25
+
+candidates:
+  - {id: O3_P2, objective: O3, parameter_space: P2}
+  - {id: O4_P2, objective: O4, parameter_space: P2}
+  - {id: O3_DecoderFiLM, objective: O3, parameter_space: DecoderFiLM}
+  - {id: O4_DecoderFiLM, objective: O4, parameter_space: DecoderFiLM}
+
+proposal:
+  algorithm: explicit_min_clipped_source_anchored_single_step
+  optimizer_object_forbidden: true
+  epsilon: 1.0e-12
+  backtracking_coefficients: [1.0, 0.5, 0.25, 0.125]
+  armijo_c: 1.0e-4
+  retry_from_exact_source_snapshot: true
+  all_rejected_action: exact_no_update
+  safety_uses_outer_target: false
+  per_attempt_label_free_safety:
+    evaluate_on_original_image: true
+    all_parameters_logits_probabilities_and_losses_finite: true
+    reliable_background_mass_delta_maximum: 0.0001
+    predicted_positive_fraction_delta_maximum: 0.001
+    connected_component_count:
+      connectivity_2d: 8
+      min_component_area: 1
+      absolute_allowance: 3
+      source_multiplier: 2.0
+      maximum_formula: max_source_plus_absolute_allowance_or_ceil_source_times_multiplier
+
+outer_oracle_task_loss:
+  role: train_only_pilot64_outer_evaluator_gradient_alignment
+  used_by_adaptation: false
+  lambda_bce: 1.0
+  lambda_soft_iou: 1.0
+  eps: 1.0e-6
+  bce_reduction: mean_over_all_pixels
+  soft_iou_reduction: mean_over_sample
+  empty_target_convention: epsilon_smoothed_union_penalizes_foreground
+
+evaluation:
+  probability_threshold: 0.5
+  threshold_rule: strict_greater_than
+  foreground_connectivity_2d: 8
+  min_component_area: 1
+  max_centroid_distance_pixels: 3.0
+  aggregation: pooled_per_cell_then_equal_cell_macro
+  missing_value_policy: forbidden_no_imputation
+
+stage_b4_r0_science_gate:
+  comparison_tolerance: 1.0e-12
+  filter_before_ranking: true
+  no_eligible_is_normal_scientific_result: true
+  maximum_selected_for_r1_r2: 4
+  per_replicate_performance_and_safety:
+    nonclean_macro_delta_iou_strictly_greater_than: 0.0
+    overall_macro_delta_iou_strictly_greater_than: 0.0
+    minimum_positive_nonclean_datasets: 2
+    worst_nonclean_dataset_delta_iou_minimum: -0.002
+    minimum_positive_corruption_families: 3
+    worst_corruption_family_delta_iou_minimum: -0.005
+    clean_macro_delta_iou_minimum: -0.002
+    each_clean_dataset_delta_iou_minimum: -0.005
+    nonclean_macro_delta_pd_minimum: -0.010
+    each_nonclean_dataset_delta_pd_minimum: -0.020
+    clean_macro_delta_pd_minimum: -0.010
+    fa_delta_maximum_formula:
+      absolute_allowance_per_million_pixels: 10.0
+      source_fa_multiplier: 0.25
+      required_strata: [overall, nonclean, clean, dataset, corruption_family]
+    foreground_fraction:
+      delta_maximum: 0.001
+      source_multiplier: 1.20
+      epsilon: 1.0e-6
+      required_strata: [overall, nonclean, clean, dataset, corruption_family]
+  alignment:
+    macro_scope: overall_2496_episodes
+    macro_gradient_cosine_minimum: 0.05
+    dataset_statistic: median_over_valid_13x64_episode_cosines
+    minimum_positive_dataset_medians: 2
+    both_gradients_nonzero_fraction_minimum: 0.80
+  activity:
+    scope: nonclean_2304_episodes
+    accepted_update_fraction_minimum: 0.20
+    no_update_fraction_maximum: 0.80
+    functional_logit_threshold: 1.0e-6
+    accepted_functional_logit_changed_fraction_minimum: 0.90
+    accepted_proposal_loss_strict_decrease_fraction_minimum: 0.90
+    accepted_finite_fraction_minimum: 1.0
+    threshold_crossing_episode_fraction_minimum: 0.02
+  gain_attribution:
+    accepted_and_no_update_subsets_required: true
+    role: report_only_not_backtracking_or_candidate_execution
+  ranking_tie_break_order:
+    - higher_nonclean_macro_delta_iou
+    - higher_worst_dataset_nonclean_delta_iou
+    - higher_overall_macro_delta_iou
+    - higher_clean_macro_delta_iou
+    - lower_nonclean_fa_delta_per_million
+    - lower_nonclean_foreground_fraction_inflation
+    - higher_nonclean_delta_pd
+    - higher_nonclean_accepted_update_fraction
+    - lexicographically_lower_candidate_id
+  r0_no_eligible_action: stop_without_R1_R2
+  r0_eligible_action: run_only_R0_eligible_candidates_in_R1_R2
+  across_R0_R1_R2_frozen_for_stage_b5:
+    every_replicate_must_pass_all_hard_gates: true
+    nonclean_macro_delta_iou_mean_minimum: 0.002
+    overall_macro_delta_iou_mean_minimum: 0.001
+    maximum_final_selected_candidates: 3
+
+implementation:
+  critical_code_paths:
+    - scripts/run_p3_stage_b4_full_pilot64_v1.py
+    - analysis/p3_stage_b4_science_gate_v1.py
+    - tta/proposal_runner_v1.py
+    - scripts/run_p3_stage_b_screen_v1.py
+    - tta/proposal_step.py
+    - tta/views/__init__.py
+    - tta/views/irstd_views.py
+    - tta/__init__.py
+    - tta/adabn.py
+    - tta/episodic_runner.py
+    - tta/objectives/__init__.py
+    - tta/objectives/_validation.py
+    - tta/objectives/balanced_entropy.py
+    - tta/objectives/region_balanced_consistency.py
+    - tta/objectives/soft_iou_anchor.py
+    - tta/objectives/foreground_mass_guard.py
+    - tta/objectives/feature_statistics.py
+    - tta/objectives/parameter_anchor.py
+    - tta/adapters/__init__.py
+    - tta/adapters/decoder_film.py
+    - tta/adapters/decoder_hook.py
+    - tta/adapters/low_rank_feature_mixer.py
+    - tta/parameter_groups.py
+    - tta/model_adapter.py
+    - tta/state_manager.py
+    - tta/d0_secure_io.py
+    - analysis/d0_v2_task_loss.py
+    - analysis/source_train_provenance.py
+    - materialize_binary_tent_ss_calibration_cache_v2.py
+    - dataio/train_side_pilot_protocol.py
+    - metrics/irstd_metrics.py
+    - metrics/irstd_metrics_v2.py
+    - metrics/connected_components.py
+    - metrics/__init__.py
+    - metrics/official_metric_adapter.py
+    - metrics/target_matching.py
+    - utils/metric.py
+    - model/MSHNet_NSFPN.py
+    - model/NS_FPN.py
+    - model/diff_cross_attns.py
+    - SFS_MSDeformAttn/ops/functions/ms_deform_attn_func.py
+    - SFS_MSDeformAttn/ops/modules/ms_deform_attn.py
+    - SFS_MSDeformAttn/ops/__init__.py
+    - SFS_MSDeformAttn/ops/functions/__init__.py
+    - SFS_MSDeformAttn/ops/modules/__init__.py
+    - analysis/__init__.py
+    - test_source.py
+    - environment.linux-64.explicit.txt
+
+output:
+  root: results/cr_sitta/p3_stage_b4_full_pilot64_proposal_gate_v1
+  candidate_phase: candidate_phase/R0
+  outer_phase: outer_phase/R0
+  aggregate_phase: aggregate_phase/R0
+  engineering_phase: engineering_dry_runs
+  atomic_no_replace: true
+  refuse_overwrite: true
+  existing_verified_complete_action: no_op

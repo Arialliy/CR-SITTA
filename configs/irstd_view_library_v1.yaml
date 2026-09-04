@@ -1,0 +1,42 @@
+schema_version: 1
+protocol_id: cr-sitta-irstd-view-library-v1
+created_at: "2026-09-03"
+
+scope:
+  source_train_development_only: true
+  corruption_agnostic: true
+  stochastic_transforms: false
+  validation_payload_allowed: false
+  test_payload_allowed: false
+
+input_contract:
+  tensor_layout: BCHW
+  channels: 3
+  physical_range_before_normalization: [0.0, 1.0]
+  normalization:
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+  replicated_grayscale_channels_must_remain_equal_in_physical_space: true
+
+teacher_views:
+  ordered_names: [identity, hflip, vflip, hvflip]
+  exact_inverse_alignment_required: true
+  rotations_90_270_allowed: false
+
+student_perturbation:
+  name: mild_contrast_0p95
+  physical_space_operation: "clip((x - 0.5) * 0.95 + 0.5, 0, 1)"
+  inverse_prediction: identity
+  random_state_access_allowed: false
+
+region_weights:
+  tau_background: 0.01
+  tau_foreground: 0.10
+  gamma_foreground: 1.0
+  gamma_background: 1.0
+  temperature_foreground: 0.01
+  temperature_background: 0.01
+  protection_radius_pixels: 3
+  foreground_background_separately_normalized: true
+  intermediate_uncertain_region_ignored: true
+

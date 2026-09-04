@@ -120,6 +120,29 @@ cell。正式 aggregate 位于 `aggregate_phase/R0/`，协议与整数守恒均�
 重算 IoU/Pd。该修正不会改变任何候选的 reason codes 或 eligibility，结论仍为
 0/10、P5 禁止。不得把旧 receipt 中这两个误标字段直接解释为 non-clean 数值。
 
+P3 Stage-B 的训练侧 development 链已经完成到 B4。B1 v2 在 3×13×64=2,496
+个 episode 上完成前景/背景梯度机制分解；首次 aggregate 因冻结容器的 tuple/list
+适配类型不一致而在发布前失败，随后由 append-only 的
+`p3_stage_b1_aggregate_recovery_v2_1/aggregate_phase_v2_1/R0/` 恢复。恢复只做
+递归容器适配，canonical 语义哈希保持一致，未改变数据、覆盖、统计或阈值，也未
+执行候选选择。
+
+B3 objective/parameter-space screen 位于
+`p3_stage_b3_objective_space_screen_v1/aggregate_phase/R0/`。它在 hash-selected
+Pilot16 上筛选 10 个候选，`O3_P2`、`O4_P2`、`O3_DecoderFiLM` 和
+`O4_DecoderFiLM` 共 4 个候选通过冻结门并进入 B4。B4 的完整 Pilot64 R0 位于
+`p3_stage_b4_full_pilot64_proposal_gate_v1/aggregate_phase/R0/`，对 4 个候选各
+执行 2,496 个 episode（合计 9,984）。最终 `scientific_status` 为
+`scientific_no_eligible`：`O3_P2` 与 `O4_P2` 的 non-clean macro ΔIoU 均为
+`+0.000357225`，但未满足正收益 corruption-family 覆盖门；两个 DecoderFiLM
+候选还未满足 dataset/family 覆盖与 threshold-crossing episode fraction 门。
+因此 selected-for-R1/R2 为空，B5、正式 test 和后续风险控制器均未授权。
+
+上述 Stage-B artifact 全部固定为 source-train-derived、development-only 和
+`paper_result: false`。其冻结配置还绑定本机保留的 v5 决策溯源 memo 以及被 Git
+忽略的 B1/B2/B3 前序 receipts；公开仓库包含计算配置、runner、门函数和单元测试，
+但不包含可在 fresh clone 中独立复验的完整历史 artifact 包。
+
 若 worker 在 receipt 构造前因工程异常退出，不会伪造单进程 receipt；这类事件
 单独登记在 `cr_sitta/tent_failure_diagnostics_v1/incidents/`，固定为非论文、
 非选择证据。2026-09-01 的首次 NUAA-SIRST equivalence 尝试即按此规则记录：它

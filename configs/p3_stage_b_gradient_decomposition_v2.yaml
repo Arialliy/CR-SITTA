@@ -1,0 +1,525 @@
+schema_version: 2
+protocol_id: cr-sitta-p3-stage-b1-gradient-decomposition-v2
+created_at: "2026-09-03"
+
+versioning:
+  predecessor_protocol_id: cr-sitta-p3-stage-b1-gradient-decomposition-v1
+  change_class: versioned_numerical_estimator_only
+  reason: >-
+    Three independently reduced region VJPs did not satisfy the frozen
+    relative reconstruction invariant on prepublication preflight image
+    XDU407, despite passing the frozen max-absolute tolerance. No formal v1
+    shard, manifest, COMPLETE receipt, or scientific result was published.
+  scientific_predicates_changed: false
+  scientific_thresholds_changed: false
+  dataset_or_family_coverage_changed: false
+  parent_numeric_tolerances_changed: false
+  v1_retry_forbidden: true
+
+frozen_design_binding:
+  document:
+    path: CR-SITTA_P3_StageA负结果后的StageB方案与代码修改_v5.md
+    sha256: 88be0c810e47f9bc3c494555421718d9b4166f3b5d13903cae515cfc7f01c91d
+    read_only: true
+
+frozen_v1_preflight_failure_binding:
+  path: results/cr_sitta/p3_stage_b_gradient_decomposition_v1/PREFLIGHT_FAILURE.json
+  sha256: b91840c2571767d373362f22a1f1d5ca6a03b7a5bd303f6716b4535a772a7e17
+  required_status: aborted_numeric_invariant
+  required_scientific_conclusion: not_evaluated
+  read_only: true
+
+frozen_parent_bindings:
+  d0_formal_stage_a_config:
+    path: configs/tent_failure_diagnostics_v3_formal_stage_a.yaml
+    sha256: f0ed056520f840d1432b90b6426f55803afa1867b98108712dc242371dd1c05a
+    read_only: true
+  d0_formal_stage_a_aggregate_complete:
+    path: results/cr_sitta/tent_failure_diagnostics_v3_formal_stage_a/aggregate_phase/R0/COMPLETE.json
+    sha256: d597f3ab1c2913016b4fc3c8bd16f99d7c3c7d119da7769642f2a33554c5032a
+    read_only: true
+  d0_formal_stage_a_aggregate_manifest:
+    path: results/cr_sitta/tent_failure_diagnostics_v3_formal_stage_a/aggregate_phase/R0/manifest.json
+    sha256: 0a14e18c1b072ce06a191f5a4321b18bc2453bd6755e8b28308956da558c6d7b
+    read_only: true
+  d0_formal_stage_a_science_decision:
+    path: results/cr_sitta/tent_failure_diagnostics_v3_formal_stage_a/aggregate_phase/R0/science_decision_receipt.json
+    sha256: 31a570e8717256aa1fdda9446d0f16c9bf4af542c0a37ff8a5f3d7de8fbb559b
+    read_only: true
+  parameter_group_config:
+    path: configs/parameter_group_pilot_v1.yaml
+    sha256: 3cfcdb768ca7adfbb85446fd14a9d02a89ba6fecd43ea25843783e571cb7b637
+    read_only: true
+  cache_protocol:
+    path: configs/binary_tent_ss_calibration_cache_v2.yaml
+    sha256: e225311cce252125eaf3a2b47eeeea4cde60d0363c8c71f48494d70e41c2aa3e
+    read_only: true
+
+required_parent_decision:
+  protocol_status: passed
+  formal_stage_a_protocol_complete: true
+  scientific_status: scientific_no_eligible
+  eligible_candidates: []
+  required_followup_replicates: []
+  stage2_allowed: false
+
+implementation:
+  critical_code_paths:
+    - analysis/foreground_background_gradient_decomposition_v2.py
+    - analysis/foreground_background_gradient_decomposition_v1.py
+    - analysis/p3_stage_b1_contract_v2.py
+    - analysis/p3_stage_b1_outer_cell_shard_v2.py
+    - analysis/p3_stage_b1_outer_cell_shard.py
+    - analysis/p3_stage_b1_aggregate_v2.py
+    - analysis/p3_stage_b1_aggregate.py
+    - scripts/run_p3_stage_b_gradient_decomposition_v2.py
+    - tta/parameter_groups.py
+    - tta/d0_v2_parameter_groups.py
+    - analysis/analyze_entropy_task_alignment.py
+    - analysis/d0_v2_task_loss.py
+    - tta/d0_v3_outer_source_gradient.py
+    - analysis/d0_v3_outer_analyzer.py
+    - analysis/d0_v3_label_free_shard.py
+    - analysis/d0_v3_outer_cell_shard.py
+    - analysis/d0_v3_phase_receipt.py
+    - analysis/source_train_provenance.py
+    - materialize_binary_tent_ss_calibration_cache_v2.py
+    - tta/model_adapter.py
+    - tta/state_manager.py
+    - tta/binary_tent.py
+    - model/MSHNet_NSFPN.py
+    - model/NS_FPN.py
+    - test_source.py
+    - tta/d0_secure_io.py
+    - tta/d0_v3_atomic_shard.py
+  path_order_is_frozen: true
+  runtime_manifest:
+    hash_algorithm: sha256
+    hash_every_critical_code_path: true
+    require_regular_non_symlink_files: true
+    reject_missing_path: true
+    reject_extra_path: true
+    reject_reordered_path: true
+    verify_live_bytes_before_any_outer_target_load: true
+    store_per_file_sha256: true
+    store_canonical_bundle_sha256: true
+
+scope:
+  phase: P3_stage_b1_foreground_background_entropy_gradient_decomposition_v2
+  role: source_train_outer_oracle_mechanism_analysis_only
+  source_train_derived: true
+  split_name: train
+  split_role: frozen_pilot64
+  dataset_count: 3
+  condition_count_per_dataset: 13
+  total_dataset_condition_cells: 39
+  image_count_per_condition: 64
+  replicate_ids: [R0]
+  paper_result: false
+  paper_test_result: false
+  performance_claim: false
+  candidate_selection_performed: false
+  stage_b3_authorized: false
+  use_validation_payload: false
+  use_test_payload: false
+  optimizer_construction: forbidden
+  optimizer_step: forbidden
+  model_weight_update: forbidden
+  checkpoint_write: forbidden
+  allowed_payload_roles:
+    [train_pilot64_image, train_pilot64_metadata, train_pilot64_outer_target]
+  forbidden_payload_roles:
+    [validation_image, validation_target, test_image, test_target, test_prediction]
+  target_access_timing: >-
+    Only after exact verification of the matching frozen Stage-A label-free
+    completion receipt for dataset, condition, and R0.
+  target_visibility: outer_analyzer_only_never_adaptation
+
+datasets:
+  IRSTD-1K:
+    checkpoint_role: best_miou
+    checkpoint_path: results/retraining_fixed_split/IRSTD-1K/best_miou.pth.tar
+    checkpoint_sha256: ee8d5c3af67d7c93ff6be25b169bd8fd59afcd776afd173b4e230ad8dc8aa8b2
+    train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+    ordered_pilot64_image_ids_sha256: 0ee4400c021dcfb639d813bc20582060a3fff8bb635292e48abf820ce90abb13
+    ordered_id_hash_source: all_13_parent_candidate_manifests_R0
+  NUAA-SIRST:
+    checkpoint_role: best_miou
+    checkpoint_path: results/retraining_fixed_split/NUAA-SIRST/best_miou.pth.tar
+    checkpoint_sha256: 23feea50a847cdfc9874fe67d338a3884d9afa75d7a27b9b71a62ff2d00379cf
+    train_split_sha256: 324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4
+    ordered_pilot64_image_ids_sha256: a48e5e3f0ec3e6911a74f953e96aa7ea362b2f2f32c37626099afd61f4935baa
+    ordered_id_hash_source: all_13_parent_candidate_manifests_R0
+  NUDT-SIRST:
+    checkpoint_role: best_miou
+    checkpoint_path: results/retraining_fixed_split/NUDT-SIRST/best_miou.pth.tar
+    checkpoint_sha256: a67d3a7e2597d201e1fecf32b7f218aefa8274ad0443d2726197d84f44d1343e
+    train_split_sha256: e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3
+    ordered_pilot64_image_ids_sha256: 5c6c8b441eab5277611fa1007354692df557db311e2d7969e34ebeaba3ae00e4
+    ordered_id_hash_source: all_13_parent_candidate_manifests_R0
+
+conditions:
+  - clean_S0
+  - gaussian_noise_S1
+  - gaussian_noise_S3
+  - gaussian_noise_S5
+  - gaussian_blur_S1
+  - gaussian_blur_S3
+  - gaussian_blur_S5
+  - low_contrast_S1
+  - low_contrast_S3
+  - low_contrast_S5
+  - stripe_noise_S1
+  - stripe_noise_S3
+  - stripe_noise_S5
+
+parent_cell_artifacts:
+  candidate_shard_template: results/cr_sitta/tent_failure_diagnostics_v3_formal_stage_a/candidate_phase/shards/R0/{dataset}/{condition}
+  outer_shard_template: results/cr_sitta/tent_failure_diagnostics_v3_formal_stage_a/outer_phase/shards/R0/{dataset}/{condition}
+  candidate_completion_receipt_required: true
+  outer_access_receipt_required: true
+  ordered_image_ids_exact_match_required: true
+  source_logits_bit_exact_match_required: true
+  parameter_layout:
+    filename: parameter_layout.json
+    layout_sha256: fbe39c8cee7b1e6fd46bfc7bc2eebd1aab3b9fcb4194d52a21ccf44d05984a4b
+    parameter_tensor_count: 106
+    scalar_parameter_count: 8736
+  source_logits:
+    candidate_filename: source_logits_pre.npy
+    outer_filename: outer_source_logits.npy
+    shape: [64, 1, 256, 256]
+    storage_dtype: float32
+  parent_entropy_gradients:
+    filename: entropy_gradients.npy
+    shape: [64, 10, 8736]
+    storage_dtype: float32
+    candidate_axis_count: 10
+    candidate_axis_order:
+      - Adam_lr_1em5
+      - Adam_lr_3em5
+      - Adam_lr_1em4
+      - Adam_lr_3em4
+      - Adam_lr_1em3
+      - SGD_lr_1em5
+      - SGD_lr_3em5
+      - SGD_lr_1em4
+      - SGD_lr_3em4
+      - SGD_lr_1em3
+  parent_task_gradients:
+    filename: supervised_gradients.npy
+    shape: [64, 8736]
+    storage_dtype: float32
+    source: frozen_parent_outer_shard
+    recompute: false
+    used_by_adaptation: false
+
+parameter_spaces:
+  source_config_path: configs/parameter_group_pilot_v1.yaml
+  source_config_sha256: 3cfcdb768ca7adfbb85446fd14a9d02a89ba6fecd43ea25843783e571cb7b637
+  nested_order: [P0, P1, P2, P3, P4]
+  groups:
+    P0:
+      role: all_BN_affine_negative_reference
+      parameter_tensor_count: 106
+      scalar_parameter_count: 8736
+    P1:
+      role: decoder_0_BN_affine
+      parameter_tensor_count: 6
+      scalar_parameter_count: 96
+    P2:
+      role: decoder_1_plus_decoder_0_BN_affine
+      parameter_tensor_count: 16
+      scalar_parameter_count: 416
+    P3:
+      role: all_decoder_BN_affine
+      parameter_tensor_count: 34
+      scalar_parameter_count: 2080
+    P4:
+      role: NS_FPN_output_side_plus_decoder_BN_affine
+      parameter_tensor_count: 42
+      scalar_parameter_count: 2592
+  one_full_P0_backward_then_layout_slice: true
+  repeated_backward_per_parameter_group: forbidden
+
+region_partition:
+  target_source: train_pilot64_outer_target
+  foreground_predicate: target>0
+  background_predicate: target==0
+  probability_definition: sigmoid(source_logits)
+  probability_partition_is_detached: true
+  subthreshold_predicate: sigmoid(source_logits)<=0.5
+  suprathreshold_predicate: sigmoid(source_logits)>0.5
+  threshold: 0.5
+  masks:
+    background: target==0
+    foreground_subthreshold: (target>0)&(sigmoid(source_logits)<=0.5)
+    foreground_suprathreshold: (target>0)&(sigmoid(source_logits)>0.5)
+  disjoint_masks_required: true
+  exhaustive_masks_required: true
+  foreground_total_definition: foreground_subthreshold+foreground_suprathreshold
+
+gradient_basis:
+  entropy_definition: binary_Bernoulli_entropy_of_sigmoid_source_logits
+  entropy_eps: 1.0e-6
+  primary_scientific_basis_order:
+    [foreground_subthreshold, foreground_suprathreshold, background]
+  primary_scientific_basis_term_count: 3
+  denominator_for_every_loss: total_image_pixel_count
+  masked_loss_definition: sum(mask*entropy)/total_image_pixel_count
+  full_entropy_definition: sum(entropy)/total_image_pixel_count
+  direct_vjp_order:
+    - full
+    - foreground_total
+    - foreground_subthreshold
+    - raw_foreground_suprathreshold
+    - raw_background
+  direct_vjp_count: 5
+  direct_vjp_execution: one_shared_source_graph_five_explicit_autograd_grad_calls
+  direct_vjp_losses:
+    full: sum(entropy)/total_image_pixel_count
+    foreground_total: sum((target>0)*entropy)/total_image_pixel_count
+    foreground_subthreshold: >-
+      sum(((target>0)&(sigmoid(source_logits)<=0.5))*entropy)/
+      total_image_pixel_count
+    raw_foreground_suprathreshold: >-
+      sum(((target>0)&(sigmoid(source_logits)>0.5))*entropy)/
+      total_image_pixel_count
+    raw_background: sum((target==0)*entropy)/total_image_pixel_count
+  stored_direct_vjps:
+    filename: cumulative_and_raw_entropy_vjps.npy
+    shape: [64, 5, 8736]
+    storage_dtype: float32
+    axis_order_matches_direct_vjp_order: true
+    store_before_primary_telescoping: true
+  primary_scientific_derivation:
+    device: cpu
+    dtype: float64
+    cast_rule: stored_float32_to_cpu_float64_before_any_subtraction
+    full: direct_vjp.full
+    foreground_total: direct_vjp.foreground_total
+    foreground_subthreshold: direct_vjp.foreground_subthreshold
+    foreground_suprathreshold: >-
+      direct_vjp.foreground_total-direct_vjp.foreground_subthreshold
+    background: direct_vjp.full-direct_vjp.foreground_total
+    additive_identity: >-
+      full equals foreground_subthreshold plus foreground_suprathreshold plus
+      background by the frozen telescoping construction.
+    fixed_hierarchy: full_contains_foreground_total_contains_foreground_subthreshold
+    data_dependent_residual_allocation: forbidden
+    raw_audit_vectors_used_by_science: false
+  raw_component_audit:
+    role: numeric_diagnostic_only
+    pairs:
+      foreground_suprathreshold:
+        derived: foreground_total-foreground_subthreshold
+        raw_direct: raw_foreground_suprathreshold
+      background:
+        derived: full-foreground_total
+        raw_direct: raw_background
+    max_abs_tolerance: 1.0e-7
+    relative_l2_tolerance: 1.0e-4
+    relative_l2_denominator: max(raw_direct_reference_l2,1.0e-12)
+    comparison_rule: report_both_and_within_dual_tolerance
+    failure_action: record_only_never_protocol_or_science_gate
+    used_by_mechanism_flags: false
+    used_by_selection_or_ranking: false
+  task_gradient_source: parent_outer_supervised_gradients.npy
+  task_gradient_recomputed: false
+
+entropy_gradient_consistency:
+  compare_all_parent_candidate_slices: true
+  compared_slice_count: 10
+  reference_slice_index: 0
+  recomputed_full_source: direct_vjp.full
+  compare_each_slice_to_recomputed_full: true
+  compare_primary_telescoping_sum_to_recomputed_full: true
+  max_abs_tolerance: 1.0e-7
+  relative_l2_tolerance: 1.0e-4
+  relative_l2_denominator: max(reference_l2,1.0e-12)
+  parent_pass_rule: max_abs_and_relative_l2_must_both_pass_for_every_slice
+  primary_telescoping_failure_action: fail_closed
+  any_nonfinite_action: fail_closed
+  tolerance_failure_action: fail_closed
+
+metric_protocol:
+  metric_accumulation_device: cpu
+  accumulation_dtype: float64
+  input_storage_cast_before_metric: float32_to_float64
+  primary_metric_vector_source: cpu_float64_telescoping_from_stored_cumulative_vjps
+  raw_direct_audit_vector_use: numeric_diagnostic_only
+  region_vjp_execution:
+    formal_device: one_explicitly_selected_visible_cuda_device
+    cpu_role: smoke_test_only
+    one_image_at_a_time: true
+    optimizer_construction: forbidden
+    optimizer_step: forbidden
+    model_weight_update: forbidden
+  vector_metrics:
+    - l2_norm
+    - dot_with_task_gradient
+    - cosine_with_task_gradient
+    - task_projection_onto_unit_task_gradient
+    - normalized_negative_gradient_task_directional_derivative
+  task_projection:
+    definition: dot(component_gradient,task_gradient)/l2_norm(task_gradient)
+    report_field_name: task_projection
+    zero_task_gradient: null
+  cross_component_metrics:
+    - foreground_background_cosine
+    - background_to_foreground_norm_ratio
+    - additive_decomposition_max_abs
+    - additive_decomposition_relative_l2
+  empty_region_detection: mask_pixel_count==0
+  empty_region_vector_metrics: null
+  zero_norm_cosine: null
+  zero_denominator_ratio: null
+  null_serialization: json_null
+  aggregation_dimensions:
+    [dataset, corruption_family, severity, condition, parameter_space, target_presence]
+  target_presence_values: [target_present, empty_target]
+  selection_or_ranking: forbidden
+
+mechanism_evidence_flags:
+  evidence_scope:
+    parameter_space: P0
+    conditions: nonclean_36_cells
+    episode_filter: target_present
+    required_nonclean_cell_count: 36
+    per_dataset_cell_count: 12
+    per_corruption_family_cell_count: 9
+  aggregation:
+    only_authorized_statistic: equal_cell_macro_of_equal_valid_target_present_episode_means
+    episode_statistic: arithmetic_mean_over_finite_non_null_target_present_episodes
+    cell_weighting: equal
+    dataset_statistic: equal_cell_macro_over_12_nonclean_cells
+    corruption_family_statistic: equal_cell_macro_over_9_nonclean_cells
+    overall_statistic: equal_cell_macro_over_36_nonclean_cells
+    projection_reduction_order:
+      - restrict_to_same_joint_valid_episode_support_when_predicate_is_joint
+      - arithmetic_mean_each_projection_within_cell
+      - equal_cell_macro_each_projection_within_requested_stratum
+      - apply_absolute_value_only_to_completed_stratum_mean
+    absolute_projection_semantics: abs(mean_projection)_never_mean(abs(projection))
+    joint_predicate_semantics: >-
+      Evaluate every condition together on the same aggregated stratum, using
+      the same joint finite non-null episode support for every required input.
+    median_or_alternative_statistic: forbidden
+  support_accounting:
+    finite_non_null_definition: value_is_not_null_and_math_isfinite
+    single_quantity_episode_support: requested_report_field_is_finite_non_null
+    joint_quantity_episode_support: >-
+      every required report field is finite and non-null on the same episode
+    cell_is_estimable: valid_non_null_episode_count>=1
+    joint_cell_is_estimable: joint_valid_non_null_episode_count>=1
+    stratum_is_estimable: valid_non_null_cell_count==required_cell_count
+    joint_stratum_is_estimable: joint_valid_non_null_cell_count==required_cell_count
+    required_count_fields:
+      per_cell:
+        - target_present_episode_count
+        - valid_non_null_episode_count
+        - null_or_nonfinite_episode_count
+      per_joint_cell:
+        - target_present_episode_count
+        - joint_valid_non_null_episode_count
+        - joint_null_or_nonfinite_episode_count
+      per_stratum:
+        - required_cell_count
+        - valid_non_null_cell_count
+        - valid_non_null_episode_count
+      per_joint_stratum:
+        - required_cell_count
+        - joint_valid_non_null_cell_count
+        - joint_valid_non_null_episode_count
+  coverage:
+    dataset_names: [IRSTD-1K, NUAA-SIRST, NUDT-SIRST]
+    corruption_family_names:
+      [gaussian_noise, gaussian_blur, low_contrast, stripe_noise]
+    minimum_supporting_datasets: 2
+    minimum_supporting_corruption_families: 3
+  comparison_tolerance: 1.0e-12
+  allowed_status_values: [supported, not_supported, not_estimable]
+  status_policy:
+    not_estimable: >-
+      Any required cell lacks finite non-null support under the flag-specific
+      single or joint support rule, or a required vector norm or ratio
+      denominator is zero. Required support counts must still be reported.
+    supported: >-
+      The frozen overall threshold and both frozen coverage thresholds pass.
+    not_supported: estimable_but_one_or_more_frozen_thresholds_fail
+  P0_flags:
+    background_norm_dominance:
+      quantity: background_to_foreground_additive_l2_norm_ratio
+      report_field_path: per_group.P0.cross_region.background_to_foreground_additive_norm_ratio.value
+      gradient_semantics: additive_full_image_denominator
+      support_mode: single_quantity_finite_non_null
+      overall_rule: value>1.0+comparison_tolerance
+      supporting_stratum_rule: value>1.0+comparison_tolerance
+    background_cancellation:
+      quantity: joint_additive_task_projection_cancellation
+      report_field_paths:
+        foreground_task_projection: per_group.P0.additive_entropy_task_alignment.foreground_entropy_add.task_projection
+        background_task_projection: per_group.P0.additive_entropy_task_alignment.background_entropy_add.task_projection
+        full_task_projection: per_group.P0.additive_entropy_task_alignment.full_entropy_mean.task_projection
+      gradient_semantics: additive_full_image_denominator
+      support_mode: same_episode_joint_finite_non_null
+      projection_aggregation: mean_projection_then_absolute_value
+      absolute_projection_semantics: abs(mean_projection)_never_mean(abs(projection))
+      joint_predicate:
+        connective: all
+        evaluate_on_same_stratum: true
+        use_same_joint_valid_episode_support: true
+        conditions:
+          foreground_projection_positive:
+            left: mean_foreground_task_projection
+            operator: ">"
+            right: +comparison_tolerance
+          background_projection_negative:
+            left: mean_background_task_projection
+            operator: "<"
+            right: -comparison_tolerance
+          full_projection_magnitude_reduced:
+            left: abs(mean_full_task_projection)+comparison_tolerance
+            operator: "<"
+            right: abs(mean_foreground_task_projection)
+      overall_rule: evaluate_joint_predicate_on_overall_stratum
+      supporting_stratum_rule: evaluate_same_joint_predicate_on_each_dataset_or_corruption_family_stratum
+      auxiliary_foreground_background_cosine:
+        report_field_path: per_group.P0.cross_region.foreground_background_additive_alignment.foreground_background_cosine
+        gradient_semantics: additive_full_image_denominator
+        role: descriptive_only_not_used_by_primary_flag_status
+        support_mode: single_quantity_finite_non_null
+    subthreshold_erasure:
+      quantity: additive_foreground_subthreshold_entropy_task_cosine
+      report_field_path: per_group.P0.additive_entropy_task_alignment.foreground_subthreshold_entropy_add.entropy_task_cosine
+      gradient_semantics: additive_full_image_denominator
+      support_mode: single_quantity_finite_non_null
+      interpretation: >-
+        Negative cosine means the negative entropy-gradient proposal has a
+        positive first-order task-loss derivative on subthreshold targets.
+      overall_rule: value<0.0-comparison_tolerance
+      supporting_stratum_rule: value<0.0-comparison_tolerance
+  small_group_alignment_hints:
+    parameter_spaces: [P1, P2, P3, P4]
+    components: [full, foreground_total]
+    report_field_paths:
+      full: per_group.{parameter_space}.additive_entropy_task_alignment.full_entropy_mean.entropy_task_cosine
+      foreground_total: per_group.{parameter_space}.additive_entropy_task_alignment.foreground_entropy_add.entropy_task_cosine
+    quantity: additive_entropy_task_cosine
+    gradient_semantics: additive_full_image_denominator
+    support_mode: single_quantity_finite_non_null
+    minimum_cosine: 0.05
+    overall_rule: value+comparison_tolerance>=minimum_cosine
+    supporting_stratum_rule: value+comparison_tolerance>=minimum_cosine
+    require_dataset_and_family_coverage: true
+    role: mechanism_hint_only_not_candidate_selection
+
+output:
+  root: results/cr_sitta/p3_stage_b_gradient_decomposition_v2
+  independent_from_parent_stage_a_root: true
+  parent_artifacts_read_only: true
+  refuse_overwrite: true
+  create_directory_during_contract_load: false
+  paper_result: false
+  paper_test_result: false
+  stage_b3_authorized: false

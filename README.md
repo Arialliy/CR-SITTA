@@ -10,10 +10,12 @@ test-time adaptation. Every episode starts from the same Source checkpoint and
 restores the complete Source state before the next image.
 
 > **Development status:** this is not yet a release of the full CR-SITTA
-> method. Candidate extraction, candidate-wise risk-constrained updates,
-> backtracking, and the second-backbone study remain future work. The current
-> AdaBN and Binary TENT implementations are baselines and infrastructure, not
-> the final CR-SITTA algorithm.
+> method. Stage-B now includes a task-aligned proposal screen and label-free
+> per-attempt backtracking, but the candidate-response Jacobian/QP risk
+> controller, final candidate selection, R1/R2 confirmation, formal test
+> evaluation, and second-backbone study remain future work. The current AdaBN,
+> Binary TENT, teacher, and Stage-B implementations are development evidence
+> and infrastructure, not the final CR-SITTA algorithm.
 
 > **Protocol status:** the local benchmark uses only the existing `train` and
 > `test` ID files under `datasets/`; no validation split is created. The current
@@ -38,6 +40,7 @@ restores the complete Source state before the next image.
 | Single-image episodic state/reset framework and AdaBN | Implemented, including the formal 3-dataset × 13-condition runner |
 | Binary Episodic TENT | Stage 1 engineering protocol and the source-train-only D0-v3 formal Stage-A diagnosis are complete. All 10 candidates failed the frozen utility gate (0/10 eligible), so R1/R2 and Stage 2/3 are hard-blocked and the all-BN entropy-update route is retained only as negative evidence |
 | Non-adaptive multi-view teacher (P4) | The local source-train Pilot64 screen is complete across 3 datasets × 13 conditions. All 10 candidates failed the frozen utility gate (0/10 eligible); the best candidate reached non-clean macro ΔIoU +0.000722, below the required >+0.001. P5 remains unauthorized |
+| Task-aligned Stage-B proposal generator | B1 mechanism decomposition completed on 2,496 train-side episodes; the B3 Pilot16 screen promoted 4/10 candidates. The full Pilot64 B4 gate then rejected all 4 candidates (0/4 eligible): the best P2 proposals reached non-clean macro ΔIoU +0.000357 but failed the frozen positive-family coverage requirement. R1/R2 and B5 remain blocked |
 | Full CR-SITTA | Not implemented yet |
 
 The untouched historical v2 runner is preserved only as a non-authorizing
@@ -103,10 +106,10 @@ cp configs/local_paths.example.yaml configs/local_paths.yaml
 Formal runners use the versioned contracts under `configs/`, fail closed when
 hashes or protocols drift, and refuse to overwrite completed artifacts. The
 generated artifact layout is documented in [results/README.md](results/README.md).
-The archived P4 v1 run also binds a locally retained decision-provenance memo
-and ignored predecessor receipts. Its public code and computational contract
-are inspectable here, but exact verification of that historical artifact is
-not self-contained in a fresh clone.
+The archived P4 and Stage-B runs also bind locally retained decision-provenance
+memos and ignored predecessor receipts. Their public code and computational
+contracts are inspectable here, but exact verification of those historical
+artifacts is not self-contained in a fresh clone.
 
 ## Verification
 
