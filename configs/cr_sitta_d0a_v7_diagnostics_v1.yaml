@@ -1,0 +1,92 @@
+schema_version: 1
+protocol_id: cr-sitta-d0a-v7-diagnostics-v1
+result_root: results/cr_sitta/d0a_v7_diagnostics_v1
+design_document: CR-SITTA_D0A_clean负结果后的方案与代码修改_v7.md
+scope:
+  stages: [P0, P1, P2, P3]
+  development_only: true
+  paper_result: false
+  no_validation_split: true
+  resume_full_training: false
+  train_ipma: false
+  authorize_d0b_or_ipma: false
+  new_test_payload_access: false
+global_seed: 42
+human_epoch: 1000
+probe_seed_namespace: cr-sitta-d0a-supervised-lfhf-train-1000e-v2
+augmentation_seed_namespace: cr-sitta-d0a-v7-diagnostic-per-image-crop-v1
+sampling:
+  pilot_manifest: configs/tta_train_side_pilot_v2/manifest.json
+  pilot_manifest_sha256: 99b1ee706fc57813b473039513566566ba2e6a065663be122c260edf9ef6dfb1
+  count: 64
+  views: [full_256, train_crop_224]
+  base_size: 256
+  crop_size: 224
+  workers: 0
+  order: existing_frozen_pilot64_file_order
+  augmentation: original_FixedSplitIRSTDDataset_train_transform_with_per_image_seed
+  historical_training_random_stream_replay: false
+probes:
+  lf_mask:
+    mask_ratio: 0.20
+    keep_probability: 0.50
+  hf_noise:
+    target_rms: 0.02
+    low_cut_ratio: 0.20
+visibility:
+  connectivity: 8
+  foreground_rule: target_gt_0
+  grayscale: arithmetic_RGB_mean
+  ring_outer_radius: 5
+  ring_inner_radius: 1
+  ring_exclude_all_targets: true
+  contrast_epsilon: 1.0e-8
+  min_clean_contrast: 0.00392156862745098
+  retention_threshold: 0.30
+  failure_fraction_threshold: 0.10
+  clipping_increase_threshold: 0.10
+  clipping_definition: target_RGB_endpoint_channel_fraction
+  gate_scope: per_dataset_per_view_per_probe
+  interpretation: diagnostic_visibility_screen_not_proof_of_semantic_label_invalidation
+gradient:
+  dataset: NUDT-SIRST
+  view: train_crop_224
+  batch_size: 16
+  num_batches: 4
+  learning_rate: 0.05
+  warm_epochs: 5
+  checkpoint: results/cr_sitta/d0a_supervised_lfhf_train_v2/NUDT-SIRST/epoch_1000_train_only.pth.tar
+  checkpoint_sha256: 6909659608f0241d1cb8822200f73de267b8e620dd619d4423783a14c5f67a75
+  run_contract: results/cr_sitta/d0a_supervised_lfhf_train_v2/NUDT-SIRST/run_contract.json
+  run_contract_sha256: 2f004c142949481cd055d0ea7700c88d04045cf0ba0e6eec45f1dc394993044e
+  output: results/cr_sitta/d0a_v7_diagnostics_v1/branch_gradients/NUDT-SIRST
+  bn_policy: clean_train_batch_stats_then_restore_degraded_batch_stats_no_running_update
+  optimizer_steps: 0
+  critical_structural_group_count: 7
+  minimum_valid_batches: 3
+  conflict_group_count_threshold: 4
+  conflict_cosine_threshold: 0.0
+  aggregation: concatenated_batch_gradients_cosine
+  adagrad_simulation: endpoint_local_counterfactual_not_historical_drift_evidence
+datasets:
+  IRSTD-1K:
+    root: datasets/IRSTD-1K
+    train_split: datasets/IRSTD-1K/img_idx/train_IRSTD-1K.txt
+    train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+    train_images: 800
+    pilot_ids: configs/tta_train_side_pilot_v2/IRSTD-1K.txt
+    pilot_ids_sha256: b66b914ac8a2177a127a2363245c82df29395f97dfe0745c802fd7211f3b988e
+  NUAA-SIRST:
+    root: datasets/NUAA-SIRST
+    train_split: datasets/NUAA-SIRST/img_idx/train_NUAA-SIRST.txt
+    train_split_sha256: 324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4
+    train_images: 213
+    pilot_ids: configs/tta_train_side_pilot_v2/NUAA-SIRST.txt
+    pilot_ids_sha256: f15f46a4f095689e126391973b1a8a216ffcb8c6330e4f348defe691ee3a369f
+  NUDT-SIRST:
+    root: datasets/NUDT-SIRST
+    train_split: datasets/NUDT-SIRST/img_idx/train_NUDT-SIRST.txt
+    train_split_sha256: e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3
+    train_images: 663
+    pilot_ids: configs/tta_train_side_pilot_v2/NUDT-SIRST.txt
+    pilot_ids_sha256: c9eebc3a23f94d0c01bd56a21c7a58475947fa53b72021d05668b1a901ded74b

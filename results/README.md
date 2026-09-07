@@ -259,6 +259,22 @@ systemd 服务持久运行，日志分别为
 其原先关于安全导出顺序的收据不再描述此次单数据集提前评测，因此本次不直接
 重新启动该版本。后续 D0-B 仍需使用冻结配置完成原定检查。
 
+上述续跑后来按用户“停止”要求终止：IRSTD-1K 停在 649/1000，NUAA-SIRST
+停在 310/1000，权重和日志保留。随后按 clean 负结果后的 v7 文档仅执行
+P0–P3 诊断，未恢复全训练。公开实现与冻结参数位于
+`analysis/compare_d0a_fixed_endpoint.py`、
+`analysis/audit_d0a_probe_label_preservation.py`、
+`analysis/audit_d0a_branch_gradients.py` 和
+`configs/cr_sitta_d0a_v7_diagnostics_v1.yaml`；统一结论保存在 Git 忽略的本地
+`cr_sitta/d0a_v7_diagnostics_v1/SUMMARY.md`，不属于源码发布内容。
+同 epoch1000 对比为 mIoU −0.114195 个百分点、PD +0.211640 个百分点、
+Fa +7.675355（×10⁻⁶），E0 三指标全害条件未触发；LF 在三组 train Pilot64
+的固定训练 crop 上分别有 16.67% / 35.00% / 22.22% 可评价目标的对比保持率
+低于 0.3，均触发 E1 风险；NUDT endpoint 只有 LF 的 1/7 结构组负夹角，
+HF 为 0/7，未触发 E2。它们不是 D0-B 通过或 IPMA 已有效的证据。
+五份新产物均已 COMPLETE；P2 最后封存的编码错误通过独立元数据 finalizer
+恢复，原数值记录、原冻结脚本和旧结果不改动。新旧训练均未自动启动。
+
 上述 Stage-B artifact 全部固定为 source-train-derived、development-only 和
 `paper_result: false`。其冻结配置还绑定本机保留的 v5 决策溯源 memo 以及被 Git
 忽略的 B1/B2/B3 前序 receipts；公开仓库包含计算配置、runner、门函数和单元测试，

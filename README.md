@@ -12,6 +12,12 @@ restores the complete Source state before the next image.
 > **Development status:** this is not yet a release of the full CR-SITTA
 > method. Stage B4 R0 rejected all 4 candidates, and the subsequent train-only
 > ASB-SFR Stage C0 signal audit rejected all three grouped parameter spaces.
+> The NUDT-SIRST D0-A fixed-endpoint clean development comparison also did not
+> improve the clean Pareto front. Follow-up v7 diagnostics triggered the
+> train-side LF visibility-risk screen (E1) on all three datasets, while the
+> all-metric clean-harm screen (E0) and endpoint gradient-conflict screen (E2)
+> did not trigger. These diagnostics do not authorize D0-B, IPMA, or formal
+> test evaluation.
 > The scoped decisions are summarized in [results/README.md](results/README.md)
 > and preserved locally in append-only Stage B4 and Stage C0 archives. Generated
 > result trees are intentionally Git-ignored and are not part of this source
@@ -57,6 +63,7 @@ restores the complete Source state before the next image.
 | Non-adaptive multi-view teacher (P4) | The local source-train Pilot64 screen is complete across 3 datasets × 13 conditions. All 10 candidates failed the frozen utility gate (0/10 eligible); the best candidate reached non-clean macro ΔIoU +0.000722, below the required >+0.001. P5 remains unauthorized |
 | Task-aligned Stage-B proposal generator | B1 mechanism decomposition completed on 2,496 train-side episodes; the B3 Pilot16 screen promoted 4/10 candidates. The full Pilot64 B4 gate then rejected all 4 candidates (0/4 eligible): the best P2 proposals reached non-clean macro ΔIoU +0.000357 but failed the frozen positive-family coverage requirement. The local C-0 negative archive preserves this scoped result; R1/R2, B5, and formal test remain blocked |
 | Stage-C ASB-SFR signal audit | C0 completed on the fixed train Pilot64. Active support was 65.58% and candidate-proximal coverage among active episodes was 81.17%, but all spaces failed the frozen 80% finite/nonzero-gradient and >0.08 macro-cosine gates. The local Stage C0 negative archive records the independently recovered decision; C1 and formal test remain blocked |
+| D0-A compatibility and v7 diagnostics | The NUDT-SIRST fixed epoch-1000 clean development comparison did not improve the clean Pareto front. Train-only Pilot64 diagnostics found an LF visibility risk on all three datasets; the E0 and E2 stop conditions did not trigger. This is diagnostic evidence only and does not authorize D0-B, IPMA, or formal test |
 | Full CR-SITTA | Not implemented or evaluated yet |
 
 The untouched historical v2 runner is preserved only as a non-authorizing
@@ -261,6 +268,33 @@ The orchestrator terminates after D0-B `verify` and publishes
 `PIPELINE_COMPLETE.json`. A negative D0-B gate is a valid scientific stop; a
 positive gate authorizes, but does not launch, D1. Neither branch accesses the
 formal test split.
+
+### D0-A v7 diagnostics
+
+After the NUDT-SIRST fixed-endpoint clean development comparison, the v7
+workflow performs diagnostics only; it does not resume full training. Its
+published source consists of the frozen
+[configuration](configs/cr_sitta_d0a_v7_diagnostics_v1.yaml), the existing-log
+[endpoint comparison](analysis/compare_d0a_fixed_endpoint.py), the train-only
+[probe visibility audit](analysis/audit_d0a_probe_label_preservation.py), and
+the endpoint [branch-gradient audit](analysis/audit_d0a_branch_gradients.py).
+Each CLI defaults to a read-only preflight and requires `--execute` before
+writing a new, no-replace local artifact. For example:
+
+```bash
+./.conda/bin/python analysis/compare_d0a_fixed_endpoint.py
+./.conda/bin/python analysis/audit_d0a_probe_label_preservation.py \
+  --dataset IRSTD-1K
+./.conda/bin/python analysis/audit_d0a_branch_gradients.py --device cuda:0
+```
+
+The completed local P0–P3 evidence is summarized in
+[results/README.md](results/README.md). Exact receipts and the SHA-bound v7
+decision memo are intentionally Git-ignored; the public repository contains
+the implementation, frozen configuration, and portable unit tests. The
+metadata-only finalizer exists solely to recover the already computed P2
+record whose final sealing step encountered a text-encoding error; it does not
+recompute or alter the numerical evidence.
 
 ## Upstream and third-party attribution
 
