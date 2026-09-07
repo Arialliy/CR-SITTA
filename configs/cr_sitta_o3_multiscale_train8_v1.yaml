@@ -1,0 +1,72 @@
+schema_version: 1
+protocol_id: cr-sitta-o3-multiscale-train8-v1
+result_root: results/cr_sitta/o3_multiscale_train8_v1/R0
+parent_config: configs/p3_stage_b4_full_pilot64_proposal_gate_v1.yaml
+parent_config_sha256: dcc2436e8e6443e5731223a49d5e8c74e326cf50f9bd065195990085d8f46614
+preregistration: configs/cr_sitta_o3_multiscale_train8_v1_preregistration.md
+dataset: NUDT-SIRST
+image_selection: first_8_ids_of_frozen_ordered_train_pilot64
+image_count: 8
+condition_source: unchanged_parent_13_conditions
+seed: 42
+scope:
+  role: source_supervised_fit_smoke
+  train_only: true
+  no_validation_split: true
+  formal_test: false
+  paper_result: false
+  full_training: false
+  fit_and_measure_on_same_images: true
+model:
+  label: CR-SITTA_O3_MultiScaleResidual_v1
+  host_checkpoint_role: best_miou
+  original_o3_p2_unchanged: true
+  placement: after_original_o3_p2_endpoint_before_frozen_output_0
+  channels: 16
+  expanded_channels: 32
+  spatial_kernels: [3, 5]
+  projection_initialization: zero
+  max_residual_ratio: 0.05
+  parameter_count: 1568
+  normalization: per_image_detached_rms_floor_1e-6
+  eca: false
+  batch_norm: false
+  dropout: false
+  spatial_branch_test_time_updates: false
+training:
+  optimizer: Adam
+  learning_rate: 0.001
+  betas: [0.9, 0.999]
+  epsilon: 0.00000001
+  weight_decay: 0.0
+  batch_size: 4
+  steps: 128
+  loss: mean_binary_cross_entropy_with_logits_plus_mean_per_image_soft_iou_loss
+  soft_iou_smoothing: 1.0
+  order: seeded_torch_cpu_permutations_repeated_until_budget
+  checkpoint_rule: fixed_last_step_no_metric_selection
+  evaluate_steps: [0, 128]
+performance_readout:
+  threshold: 0.5
+  threshold_comparison: strictly_greater
+  metrics: [IoU, nIoU, Pd, Fa_per_million]
+  nonclean: unweighted_mean_of_12_conditions
+  clean: separately_reported
+  learning_check: final_full_fit_loss_strictly_below_initial
+  performance_signal: nonclean_iou_above_o3_and_pd_at_least_o3_and_fa_at_most_o3_and_clean_iou_pd_fa_not_worse_than_o3
+  numerical_tolerance: 0.000000000001
+  permits_automatic_full_training: false
+outputs:
+  feature_cache_dtype: float32
+  save_all_prediction_masks: true
+  save_initial_and_final_adapter_checkpoints: true
+  overwrite: false
+implementation_files:
+  - model/o3_multiscale_residual_v1.py
+  - tta/o3_endpoint_features_v1.py
+  - analysis/o3_multiscale_train_data_v1.py
+  - scripts/run_o3_multiscale_train8_v1.py
+  - tests/test_o3_multiscale_residual_v1.py
+  - tests/test_o3_endpoint_features_v1.py
+  - tests/test_o3_multiscale_train_data_v1.py
+  - tests/test_o3_multiscale_train8_runner_v1.py

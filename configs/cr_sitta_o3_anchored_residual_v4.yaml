@@ -1,0 +1,88 @@
+schema_version: 1
+protocol_id: cr-sitta-o3-anchored-residual-train8-v4
+result_root: results/cr_sitta/o3_anchored_residual_v4/R0
+parent_run: results/cr_sitta/o3_multiscale_train8_v1/R0
+preregistration: configs/cr_sitta_o3_anchored_residual_v4_preregistration.md
+dataset: NUDT-SIRST
+scope:
+  role: source_supervised_paired_fit_smoke
+  image_count: 8
+  condition_count: 13
+  sample_count: 104
+  image_selection: unchanged_parent_train8
+  train_only: true
+  no_validation_split: true
+  fit_and_measure_on_same_images: true
+  formal_test: false
+  paper_result: false
+  full_training: false
+  automatic_full_training_allowed: false
+initialization:
+  checkpoint: step_0128.pth.tar
+  checkpoint_sha256: 1e993844145623e0f66bb77f6f3a61297edfe6b40ce8d3e0636a76ee8370aca0
+  source_model: trained_v1_not_v2
+  host_checkpoint_role: best_miou
+  original_o3_p2_unchanged: true
+model:
+  label: CR-SITTA_O3_AnchoredResidual_v4
+  control: ordinary_v1_continued_from_trained_v1
+  candidate: frozen_v1_features_plus_point05_rms_times_live_minus_anchor_raw_preactivation
+  candidate_anchor: trained_v1_frozen
+  candidate_live_initialization: exact_copy_of_trained_v1
+  trainable_parameters_per_arm: 1568
+  candidate_additional_frozen_parameters: 1568
+  preserve_initial_v1_prediction_bit_exact: true
+  candidate_has_hard_residual_amplitude_bound: false
+  inference_uses_gt: false
+training:
+  seed: 42
+  arms: [control, candidate]
+  steps_per_arm: 128
+  inherited_source_fit_steps: 128
+  batch_size: 4
+  optimizer: Adam
+  optimizer_initialization: fresh_per_arm
+  learning_rate: 0.001
+  betas: [0.9, 0.999]
+  epsilon: 0.00000001
+  weight_decay: 0.0
+  schedule: exact_parent_training_order_json_for_both_arms
+  loss: unchanged_v1_mean_BCE_plus_mean_per_image_soft_IoU_smoothing_one
+  additional_loss: none
+  gradient_clipping: none
+  evaluate_steps: [0, 128]
+  checkpoint_rule: fixed_last_step_no_metric_selection
+evaluation:
+  prediction_threshold: 0.5
+  comparison: strictly_greater
+  original_connectivity: 2
+  original_centroid_distance_strictly_less_than: 3.0
+  save_all_five_method_masks: true
+  save_probabilities: true
+  save_object_transitions: true
+  nonclean_aggregation: equal_mean_of_12_conditions
+criteria:
+  numerical_tolerance: 0.000000000001
+  both_full_fit_losses_decrease: true
+  candidate_nonclean_iou_above_v1_and_control: true
+  candidate_nonclean_pd_not_below_v1_and_control: true
+  candidate_nonclean_fa_not_above_v1_and_control: true
+  candidate_clean_iou_pd_fa_not_worse_than_v1: true
+  candidate_v1_tp_to_fn_all_104_equals_zero: true
+  candidate_each_family_iou_pd_not_below_v1: true
+  family_fa_reported_not_gated: true
+diagnostics:
+  original_componentwise_box_logit_bound: point05_rms_times_l1_head_weights
+  box_bound_is_gt_assisted_offline_diagnostic: true
+  report_residual_rms_ratio_and_logit_range: true
+  abort_on_nonfinite_not_on_bad_performance: true
+implementation_files:
+  - model/o3_anchored_residual_v4.py
+  - analysis/o3_anchored_metrics_v4.py
+  - analysis/o3_multiscale_guard_contract_v2.py
+  - analysis/o3_reachability_objects_v3.py
+  - scripts/run_o3_residual_reachability_v3.py
+  - scripts/run_o3_anchored_residual_v4.py
+  - tests/test_o3_anchored_residual_v4.py
+  - tests/test_o3_anchored_metrics_v4.py
+  - tests/test_o3_anchored_runner_v4.py

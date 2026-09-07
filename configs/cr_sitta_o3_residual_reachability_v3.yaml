@@ -1,0 +1,53 @@
+schema_version: 1
+protocol_id: cr-sitta-o3-residual-reachability-train8-v3
+result_root: results/cr_sitta/o3_residual_reachability_v3/R0
+parent_run: results/cr_sitta/o3_multiscale_train8_v1/R0
+preregistration: configs/cr_sitta_o3_residual_reachability_v3_preregistration.md
+dataset: NUDT-SIRST
+scope:
+  role: offline_gt_assisted_expressivity_diagnostic
+  image_selection: unchanged_parent_train8
+  image_count: 8
+  condition_count: 13
+  sample_count: 104
+  train_only: true
+  no_validation_split: true
+  formal_test: false
+  paper_result: false
+  optimizer_steps: 0
+  new_model: false
+  automatic_training_allowed: false
+  oracle_uses_gt: true
+  oracle_deployable: false
+model_binding:
+  source: frozen_v1_step_0128
+  checkpoint_sha256: 1e993844145623e0f66bb77f6f3a61297edfe6b40ce8d3e0636a76ee8370aca0
+  host_checkpoint_role: best_miou
+  frozen_head: original_affine_1x1_output_0
+  new_o3_episodes: 0
+diagnostic:
+  hypothesis: existing_residual_direction_is_sufficient_with_spatial_scalar_gain
+  feature_formula: h_o3_plus_a_times_h_v1_minus_h_o3
+  logit_formula: z_o3_plus_a_times_z_v1_minus_z_o3
+  gain_interval: [0, 2]
+  interval_type: optimistic_closed_relaxation_of_tanh_open_interval
+  envelope_dtype: float64_from_replayed_float32_logits
+  threshold: strictly_logit_greater_than_zero
+  saved_probability_replay: bit_exact_all_104_samples
+  original_mask_equivalence: require_float32_sigmoid_greater_than_point5_equals_logit_greater_than_zero
+  oracle_rule: keep_gain_one_except_fix_reachable_v1_pixel_errors_using_gain_zero_or_two
+  bound_claim: pixel_IoU_only_under_independent_per_pixel_oracle_gain
+  pd_fa_bound_claim: false
+  learnability_claim: false
+  original_gt_component_connectivity: 2
+  original_matching_distance_strictly_less_than: 3.0
+  record_zero_endpoint_boundary_cases: true
+  selection: all_parent_samples_no_performance_selection
+implementation_files:
+  - analysis/o3_multiscale_guard_contract_v2.py
+  - analysis/o3_residual_reachability_v3.py
+  - analysis/o3_reachability_objects_v3.py
+  - scripts/run_o3_residual_reachability_v3.py
+  - tests/test_o3_residual_reachability_v3.py
+  - tests/test_o3_reachability_objects_v3.py
+  - tests/test_o3_residual_reachability_runner_v3.py

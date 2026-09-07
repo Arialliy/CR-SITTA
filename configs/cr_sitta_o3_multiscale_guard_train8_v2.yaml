@@ -1,0 +1,83 @@
+schema_version: 1
+protocol_id: cr-sitta-o3-multiscale-background-guard-train8-v2
+result_root: results/cr_sitta/o3_multiscale_guard_train8_v2/R0
+parent_run: results/cr_sitta/o3_multiscale_train8_v1/R0
+parent_manifest_sha256: ba2fadbd15b01c5f9e331f78678420c6993917ffff246ea31f7e52ba681801d4
+parent_ledger_sha256: 06a9c5e2f78c9194d5c6cebae7ab518d838bd86390cc9953bebc31dbb69fc329
+preregistration: configs/cr_sitta_o3_multiscale_guard_train8_v2_preregistration.md
+dataset: NUDT-SIRST
+scope:
+  role: source_supervised_fit_smoke
+  image_selection: unchanged_parent_train8
+  image_count: 8
+  condition_count: 13
+  sample_count: 104
+  train_only: true
+  no_validation_split: true
+  fit_and_measure_on_same_images: true
+  formal_test: false
+  paper_result: false
+  full_training: false
+model:
+  label: CR-SITTA_O3_MultiScaleResidual_BGGuard_v2
+  architecture: unchanged_model_o3_multiscale_residual_v1
+  trainable_parameters: 1568
+  host_checkpoint_role: best_miou
+  original_o3_p2_unchanged: true
+  reuse_exact_parent_endpoint_features: true
+  same_initialization_as_v1: true
+  initialization_artifact: initial.pth.tar
+  initialization_sha256: ca5eee64e948f58c00ab265a1e7c69417adccc095e03c30ddb62cc97adec6daa
+  start_from_v1_trained_weights: false
+  prediction_threshold: 0.5
+  prediction_comparison: strictly_greater
+  inference_uses_gt: false
+  test_time_filtering: false
+training:
+  seed: 42
+  optimizer: Adam
+  learning_rate: 0.001
+  betas: [0.9, 0.999]
+  epsilon: 0.00000001
+  weight_decay: 0.0
+  batch_size: 4
+  steps: 128
+  sample_order: exact_parent_training_order_json
+  optimizer_initialization: fresh_zero_state
+  base_loss: unchanged_v1_BCE_plus_per_image_soft_IoU
+  additional_loss: mean_per_image_sum_gt_background_positive_probability_increment_divided_by_gt_area_clamped_at_one
+  reference: detached_frozen_head_of_same_batch_o3_features
+  additional_loss_weight: 1.0
+  checkpoint_rule: fixed_last_step_no_metric_selection
+  evaluate_steps: [0, 128]
+performance_criteria:
+  numerical_tolerance: 0.000000000001
+  augmented_full_fit_loss_decreases: true
+  nonclean_iou_above_v1: true
+  nonclean_pd_at_least_v1: true
+  nonclean_fa_at_most_v1: true
+  low_contrast_iou_at_least_v1: true
+  stripe_noise_iou_at_least_v1: true
+  gaussian_blur_iou_at_least_o3: true
+  gaussian_noise_iou_at_least_o3: true
+  gaussian_blur_fa_at_most_o3: true
+  gaussian_noise_fa_at_most_o3: true
+  clean_iou_at_least_o3: true
+  clean_pd_at_least_o3: true
+  clean_fa_at_most_o3: true
+  automatic_full_training_allowed: false
+outputs:
+  save_guarded_probabilities: true
+  save_all_four_method_prediction_masks: true
+  save_13_condition_metrics: true
+  save_fixed_last_checkpoint: true
+  overwrite_existing_run: false
+implementation_files:
+  - training/o3_background_nonexpansion_v2.py
+  - analysis/o3_multiscale_guard_contract_v2.py
+  - analysis/o3_multiscale_guard_metrics_v2.py
+  - scripts/run_o3_multiscale_guard_train8_v2.py
+  - tests/test_o3_background_nonexpansion_v2.py
+  - tests/test_o3_multiscale_guard_contract_v2.py
+  - tests/test_o3_multiscale_guard_metrics_v2.py
+  - tests/test_o3_multiscale_guard_train8_runner_v2.py

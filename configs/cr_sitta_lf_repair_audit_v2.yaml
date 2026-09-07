@@ -1,0 +1,82 @@
+schema_version: 1
+protocol_id: cr-sitta-lf-repair-audit-v2
+design_document: CR-SITTA_P0-P3诊断后的LF修复与IPMA微型验证_v9.md
+implementation_addendum: configs/cr_sitta_lf_repair_audit_v2_preregistration.md
+legacy_config: configs/cr_sitta_d0a_v7_diagnostics_v1.yaml
+legacy_config_sha256: f68ad21683b811e46bf864eb8293419db2227eae3e5a759e6815f586009e2844
+result_root: results/cr_sitta/lf_repair_audit_v2
+parent_result_root: results/cr_sitta/d0a_v7_diagnostics_v1
+parent_code_anchor: 9bccebb92aaabcd4c97e1556de96d1a643af69b8
+parent_execution_receipt_sha256: 96a76ecff017e81b8bf76e69401267d7ff91faf12578c076b84beebdb592e340
+parent_manifests:
+  fixed_endpoint/NUDT-SIRST: 9a80f082202090acfaaf6b29f7c42ecaf784088ba26a0712040d489b153cee97
+  probe_label_preservation/IRSTD-1K: 94ce20b2a3e6ff3adb49134371b1f11d682396bd73d9bc849c8dccd1a0bbb7e8
+  probe_label_preservation/NUAA-SIRST: 1065264aa82dd042ed7e6d878856cefbd65a993bab98986797447bc0aa3a7313
+  probe_label_preservation/NUDT-SIRST: 4916e556584fb06acb2e498b7c19768fe95623b7e7f95388da234b121fdd5f0c
+  branch_gradients/NUDT-SIRST: 6882e8a1903e419748ab143b4900ca974c267695337eb8cfe62e39d881844027
+stage_scope:
+  full_source_training_allowed: false
+  ipma_meta_training_allowed: false
+  formal_test_allowed: false
+  new_test_payload_access: false
+  new_validation_split: false
+  paper_result: false
+scientific_scope: augmentation_visibility_screen_only
+datasets: [IRSTD-1K, NUAA-SIRST, NUDT-SIRST]
+views: [full_256, train_crop_224]
+pilot_images_per_dataset: 64
+device: cpu
+threads: 2
+global_seed: 42
+probe_seed_namespace: cr-sitta-lf-repair-audit-v2-paired-orbits
+random_field:
+  shape: batch_physical_channels_all_orbits_including_dc
+  dtype: float64
+  device: cpu
+  orbit_order: ascending_canonical_flat_index
+  shared_channel_selection: channel_0
+  candidate_id_in_seed: false
+  include_view_in_seed: true
+  seed_replicates: 1
+  legacy_new_frequency_masks_identical_claimed: false
+operator:
+  mask_ratio: 0.20
+  pair_keep_probability: 0.50
+variants:
+  - {probe_id: L1, attenuation: 1.0, protect_dc: false, shared_channels: false}
+  - {probe_id: L2, attenuation: 1.0, protect_dc: true, shared_channels: false}
+  - {probe_id: L3, attenuation: 1.0, protect_dc: true, shared_channels: true}
+  - {probe_id: L4a, attenuation: 0.25, protect_dc: true, shared_channels: true}
+  - {probe_id: L4b, attenuation: 0.50, protect_dc: true, shared_channels: true}
+gate:
+  candidates: [L4a, L4b]
+  risk_fraction_max: 0.10
+  compound_denominator: original_e1_eligible
+  image_rms_floor: 1.0e-6
+  image_rms_fraction_min: 0.90
+  image_rms_aggregation: each_dataset_view_median_and_coverage
+  empty_eligible_status: insufficient_evidence
+  constant_images: retain_in_denominator_and_report_noninformative
+selection:
+  preferred: L4a
+  r3_selected_probe_must_be: L4a
+  stronger_only_pass: alternate_eligible_no_automatic_promotion
+  l4b_promotion_requires: separate_unlabeled_teacher_signal_receipt_not_implemented_in_R3
+bootstrap:
+  replicates: 2000
+  seed: 42
+  confidence_level: 0.95
+  unit: source_image_id
+  interval: percentile
+  paired_to: sealed_L0_same_image_and_view
+  zero_denominator_replicates: omit_and_report_count_not_fill_zero
+  interval_used_for_gate: false
+evaluation:
+  visibility_definition: unchanged_v7_config
+  target_components: keep_all_including_low_contrast_invalid_ring_and_empty_crops
+  mask_rule: GT_gt_0
+  detection_threshold_reserved: strict_sigmoid_gt_0.5
+  detector_forward_enabled: false
+  detector_backward_enabled: false
+  checkpoint_loaded: false
+  legacy_L0: sealed_records_read_only_no_rerun

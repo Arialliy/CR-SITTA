@@ -1,0 +1,109 @@
+schema_version: 1
+protocol_id: cr-sitta-ipma-micro16-v1
+stage: R4_engineering_only
+result_root: results/cr_sitta/ipma_micro16_v1/engineering
+design_document: CR-SITTA_P0-P3诊断后的LF修复与IPMA微型验证_v9.md
+addendum: configs/cr_sitta_ipma_micro16_v1_preregistration.md
+lf_config: configs/cr_sitta_lf_repair_audit_v2.yaml
+lf_finalization_manifest_sha256: 1c67ab57501447a31c36022304191e6b0832ae5378757c78f7d3f9c55ee97323
+lf_gate_sha256: ea60355a4e39beb8d7836eb5a6aaea089b00edb0d155d16f7f58e24fb43dd135
+lf_approved_config_sha256: a33410cabe717a2cced4723e44f22bb79a1b6b8846278c2a43d0fa6fc9127d7a
+host:
+  architecture: MSHNet_NSFPN
+  dataset: NUDT-SIRST
+  epoch: 1000
+  source_checkpoint: results/cr_sitta/d0a_supervised_lfhf_train_v2/NUDT-SIRST/epoch_1000_train_only.pth.tar
+  source_checkpoint_sha256: 6909659608f0241d1cb8822200f73de267b8e620dd619d4423783a14c5f67a75
+  safe_checkpoint: results/cr_sitta/d0a_supervised_lfhf_train_v2/NUDT-SIRST/epoch_1000_train_only_safe.pth.tar
+  safe_checkpoint_sha256: 3b525f1c037fd6bec036afe249a7430e43cd3599a100fc80ffea0583042955ec
+  safe_export: results/cr_sitta/d0a_supervised_lfhf_train_v2/NUDT-SIRST/SAFE_EXPORT.json
+  safe_export_sha256: cc8d0beeeb5e565695b1e864024feb70ab55b2113d19e773a1aa98d53c9708dc
+  run_contract: results/cr_sitta/d0a_supervised_lfhf_train_v2/NUDT-SIRST/run_contract.json
+  run_contract_sha256: 2f004c142949481cd055d0ea7700c88d04045cf0ba0e6eec45f1dc394993044e
+  weights_only_load: true
+  state_dict_keys: 505
+  bn_policy: eval_frozen_running_statistics
+sampling:
+  dataset: NUDT-SIRST
+  view: train_crop_224
+  images_total: 16
+  meta_fit_images: 8
+  meta_check_images: 8
+  order: original_frozen_pilot64_prefix_no_shuffle
+  ids: ['000891', '001005', '000641', '001179', '000328', '001048', '000460', '001228', '000739', '000624', '000672', '000052', '000097', '001132', '000101', '000014']
+  check_gt_decode_allowed: false
+  fit_gt_use: outer_gradient_and_posthoc_diagnostics_only
+  empty_crops: keep_without_replacement
+adapter:
+  channels: 16
+  rank: 4
+  basis_count: 5
+  initialization_seed: 42
+  initialization_device: cpu
+  rms_squared_floor: 1.0e-12
+  delta_state: external_episode_local_zero
+inner:
+  steps: 1
+  learning_rate: 0.05
+  delta_l2_radius: 0.01
+proxy:
+  name: region_normalized_soft_bce
+  teacher: observed_image_frozen_host_sigmoid_detached
+  region_weights: [q, 1-q]
+  reliable_candidate_filter: none
+  background_only_teacher: allowed_not_claimed_reliable
+  unavailable_or_nonfinite_proxy: record_abstain_and_do_not_claim_success
+task_loss:
+  name: SLSIoULoss
+  warm_epoch: 5
+  epoch: 999
+  with_shape: true
+  input: raw_logits
+engineering:
+  proxy_gradient_norm_floor: 1.0e-8
+  probe_logit_rms_floor: 1.0e-6
+  post_logit_rms_floor: 1.0e-6
+  minimum_informative_episodes: 12
+  meta_gradient_norm_floor: 1.0e-8
+  minimum_nonzero_meta_fit_episodes: 6
+  require_all_finite: true
+  require_all_identity_exact: true
+  require_all_replays_exact: true
+  require_all_fd_passed: true
+finite_difference:
+  device: cpu
+  dtype: float64
+  epsilon: 1.0e-4
+  absolute_tolerance: 1.0e-6
+  relative_tolerance: 1.0e-3
+  direction_seed: 20260907
+  directions: [normalized_meta_gradient, normalized_seeded_random]
+  teacher: fixed_native_float32_cast_double
+runtime:
+  device: cuda:0
+  native_dtype: float32
+  autocast: false
+  allow_tf32: false
+  deterministic_algorithms: true
+  cudnn_benchmark: false
+  cudnn_deterministic: true
+  cpu_threads: 2
+  cublas_workspace_config: ':4096:8'
+evaluation:
+  probability_threshold: 0.5
+  threshold_rule: strict_gt
+  probability_source: native_torch_sigmoid_float32
+  connectivity: 8
+  max_centroid_distance: 3.0
+  min_component_area: 1
+  labeled_metrics_scope: meta_fit_train8_only
+  select_on_task_improvement: false
+  save_all_prediction_masks: true
+scope:
+  outer_optimizer_steps: 0
+  ipma_meta_training_allowed: false
+  full_source_training_allowed: false
+  formal_test_allowed: false
+  new_validation_split: false
+  paper_result: false
+  r5_requires_separate_frozen_contract: true

@@ -16,8 +16,10 @@ restores the complete Source state before the next image.
 > improve the clean Pareto front. Follow-up v7 diagnostics triggered the
 > train-side LF visibility-risk screen (E1) on all three datasets, while the
 > all-metric clean-harm screen (E0) and endpoint gradient-conflict screen (E2)
-> did not trigger. These diagnostics do not authorize D0-B, IPMA, or formal
-> test evaluation.
+> did not trigger. Later train-only v9 work completed an LF repair audit, a
+> 16-image IPMA engineering check, and several O3 residual probes. These remain
+> small-pilot or engineering evidence: they do not authorize D0-B, R5 IPMA
+> outer training, full training, or formal test evaluation.
 > The scoped decisions are summarized in [results/README.md](results/README.md)
 > and preserved locally in append-only Stage B4 and Stage C0 archives. Generated
 > result trees are intentionally Git-ignored and are not part of this source
@@ -64,6 +66,8 @@ restores the complete Source state before the next image.
 | Task-aligned Stage-B proposal generator | B1 mechanism decomposition completed on 2,496 train-side episodes; the B3 Pilot16 screen promoted 4/10 candidates. The full Pilot64 B4 gate then rejected all 4 candidates (0/4 eligible): the best P2 proposals reached non-clean macro ΔIoU +0.000357 but failed the frozen positive-family coverage requirement. The local C-0 negative archive preserves this scoped result; R1/R2, B5, and formal test remain blocked |
 | Stage-C ASB-SFR signal audit | C0 completed on the fixed train Pilot64. Active support was 65.58% and candidate-proximal coverage among active episodes was 81.17%, but all spaces failed the frozen 80% finite/nonzero-gradient and >0.08 macro-cosine gates. The local Stage C0 negative archive records the independently recovered decision; C1 and formal test remain blocked |
 | D0-A compatibility and v7 diagnostics | The NUDT-SIRST fixed epoch-1000 clean development comparison did not improve the clean Pareto front. Train-only Pilot64 diagnostics found an LF visibility risk on all three datasets; the E0 and E2 stop conditions did not trigger. This is diagnostic evidence only and does not authorize D0-B, IPMA, or formal test |
+| LF repair and IPMA micro16 | The v9 LF R0-R3 audit and 16-image IPMA R4 engineering checks are complete locally. Identity, label-free signal, finite-difference, and state-restoration checks passed, but an untrained one-step probe did not improve IoU. R5 meta-training and formal evaluation remain unauthorized |
+| O3 residual follow-ups | Spatial, multiscale, background-guard, reachability-oracle, and anchored-residual train-side probes are implemented. They provide scoped diagnostic or small-pilot evidence; no branch passed all of its frozen performance criteria or authorizes formal test evaluation |
 | Full CR-SITTA | Not implemented or evaluated yet |
 
 The untouched historical v2 runner is preserved only as a non-authorizing
@@ -295,6 +299,28 @@ the implementation, frozen configuration, and portable unit tests. The
 metadata-only finalizer exists solely to recover the already computed P2
 record whose final sealing step encountered a text-encoding error; it does not
 recompute or alter the numerical evidence.
+
+### v9 train-side engineering follow-ups
+
+The later v9 work remains deliberately separated from formal test evaluation.
+The public LF/IPMA surface consists of the frozen
+[LF repair contract](configs/cr_sitta_lf_repair_audit_v2.yaml),
+[LF audit](analysis/audit_lf_repair_v2.py),
+[IPMA micro16 contract](configs/cr_sitta_ipma_micro16_v1.yaml),
+[IPMA adapter](model/ipma_d0_adapter_v1.py), and
+[engineering audit](analysis/audit_ipma_micro16_v1.py). The public O3 surface
+includes the [spatial residual](configs/cr_sitta_o3_spatial_residual_v1.yaml),
+[multiscale residual](configs/cr_sitta_o3_multiscale_train8_v1.yaml),
+[background guard](configs/cr_sitta_o3_multiscale_guard_train8_v2.yaml),
+[reachability diagnostic](configs/cr_sitta_o3_residual_reachability_v3.yaml),
+and [anchored residual](configs/cr_sitta_o3_anchored_residual_v4.yaml)
+contracts with their matching runners and tests.
+
+Only source, configuration, preregistration, and tests are published. Local
+datasets, checkpoints, masks, receipts, literature notes, result trees, and
+the SHA-bound v9 decision memo remain Git-ignored. See
+[results/README.md](results/README.md) for the scoped outcomes and evidence
+boundary.
 
 ## Upstream and third-party attribution
 

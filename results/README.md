@@ -23,6 +23,78 @@ results/
 
 ## 科学资格与数据边界
 
+下述 `results/cr_sitta/...` 路径均为本机 Git-ignored 实验档案，便于在已恢复
+私有输入的研究环境中定位证据；它们不随本源码仓库发布。可公开复核的实现、
+冻结配置、预注册说明和测试位于仓库的 `analysis/`、`configs/`、`model/`、
+`scripts/`、`training/`、`tta/` 与 `tests/` 目录。
+
+最新设计依据见
+`results/cr_sitta/literature-search-20260908-model-mechanisms/papers.md`：
+已筛选8篇、核对5篇论文与固定版本作者代码，针对Fa退步梳理跨层判别、选择性融合、形状与弱目标信息保留。
+确认宿主已有注意力/跨层融合/SLS监督，不能重复包装为新设计。仅形成待验证方向，未新增模型或启动训练。
+
+最新模型修改为
+`results/cr_sitta/o3_anchored_residual_v4/SUMMARY.md`：
+从已训练v1精确起步，将新增残差与原tanh硬幅度约束解耦；与有界v1续训同预算比较，
+两臂各追加128步。候选非clean IoU45.723782%，高于v1的45.082349%及control的45.085752%；
+但Pd不变、Fa升至53.723653/Mpix，noise/blur/stripe IoU退步，预定20项判据15通过5失败。
+128项检查通过，两份固定末步pth.tar和全部520张mask已保存。这是同train8拟合的部分收益，
+不是综合通过或正式性能刷新；不新增验证集、不读取test数据、不自动全训练。
+
+最新机制诊断为
+`results/cr_sitta/o3_residual_reachability_v3/SUMMARY.md`：
+不先增加门控，而是检查冻结v1残差乘以每位置[0,2]增益的理想可达性。已完成原train8×13条件，
+0次训练更新；即使知道GT，非clean的1234个FN中仍有1198个不可修、592个FP中仍有547个不可修。
+像素IoU oracle为46.862166%（实际v1为45.082349%），但它依赖GT，**不是新模型性能**或Pd/Fa上界。
+130项测试通过，416张mask已保存。不新增验证集、不读取test数据，不自动进入全训练；
+结论支持重新审视修正机制，不能单独证明缺少某个特征模块。
+
+最新训练约束分支为
+`results/cr_sitta/o3_multiscale_guard_train8_v2/README.md`：
+保持同一多尺度模型/初始化/104份train8特征/128步预算，仅增加背景概率正向增量监督惩罚。
+已完成，13项判据8通过5失败：消除了v1新增clean假警并改善blur，但nonclean相对v1
+IoU−0.515203个百分点、Pd−1.851852个百分点、Fa+3.496806/Mpix，未成为新的最优方案。
+127项合成测试与416张mask核验通过，完成汇总保存在同一 Git-ignored 目录的
+`SUMMARY.md`。
+本轮同图拟合读数，没有新验证集或test，不自动全训练；v1保留为同范围性能参考。
+
+最新模型实现为
+`results/cr_sitta/o3_multiscale_train8_v1/README.md`：
+保留原 O3/P2 更新，后置 source-trained 3×3/5×5 多尺度残差（1568 参数）。
+本轮只做固定 NUDT 训练 Pilot 前 8 图 × 13 条件、128 次 Adam 更新的拟合检查；
+现已完成：非 clean IoU 44.395859%→45.082349%、Pd 73.148148%→75.925926%，
+Fa 57.538350→49.432119/Mpix；但模糊 IoU 下降，clean Fa 多两个像素，预定目标 6/7。
+104 项合成测试通过，312 张 mask 与全部权重/结果已保存；汇总位于同一
+Git-ignored 目录的 `SUMMARY.md`。
+八图同时用于拟合和读数，不是泛化结果；不新增验证集，不自动启动 full train/test。
+
+上一轮空间残差候选为
+`results/cr_sitta/o3_spatial_residual_v1/README.md`：
+从 v5 O3/P2 的更新方案出发，替换为 D0 逐通道 3×3 空间残差，针对噪声/模糊
+IoU 与 Fa 短板做三个数据集各 64 张 train pilot × 13 条件的性能验证。
+39 个条件已全部完成并封存，2496 张预测 mask 已保存；非 clean IoU 为
+61.560435%，低于旧 O3/P2 的 61.587737%，16 项预定性能目标中 5 项未达到。
+完成结果保存在同一 Git-ignored 目录的 `SUMMARY.md`。182 项相关合成测试
+通过不代表性能提升，本候选不自动进入后续阶段。
+本轮只使用原 best_miou 宿主，没有新验证集，不运行 test 或 1000 epoch 全训练。
+
+最新 v9 R4 IPMA 工程检查位于
+`results/cr_sitta/ipma_micro16_v1/SUMMARY.md`：
+NUDT 原 Pilot 顺序前 16 张的恒等性与无标签信号全部通过，前 8 张真 meta
+梯度有 6/8 超过预设下限，8/8 两方向有限差分通过，跨图状态精确恢复。
+本轮 369 项合成/回归测试通过，64 张预测 mask 已全部保存。**这是工程通过，
+不是性能提升**：前 8 张未训练 IPMA 一步适应的 IoU 为 71.3235%→70.8029%，
+Pd/Fa 不变。φ 未训练，后 8 张 GT 未解码；尚未启动 R5、全训练或 test。
+下一步须单独冻结最多 64 次 outer step 的 R5 协议和效用判据。
+
+最新 v9 LF 修复阶段结果位于
+`results/cr_sitta/lf_repair_audit_v2/SUMMARY.md`：
+R0–R3 已完成，原训练 Pilot64 的三数据集×两视图配对审计通过，按预注册顺序
+冻结 L4a（α=0.25）。本轮 228 项本地测试通过；完整逐图/逐目标记录、随机场、
+测试日志和准入 receipt 均在该目录。资格仅限 16 图信号工程检查，不是检测性能
+提升，不授权 IPMA meta-training、全训练或 test；未更新原权重、未新增验证集。
+旧五份诊断证据和旧 LF 实现保持不变。
+
 官方数据入口只使用 `datasets/<dataset>/img_idx/` 中既有的 `train_*.txt`
 和 `test_*.txt`，不创建验证集，也不改变这些 ID 文件。训练侧固定 64 图的
 TTA Pilot 仅用于方法超参数校准；它不是新的数据划分、不是模型训练集缩减，

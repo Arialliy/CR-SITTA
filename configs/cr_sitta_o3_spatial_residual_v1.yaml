@@ -1,0 +1,98 @@
+schema_version: 1
+protocol_id: cr-sitta-o3-spatial-residual-v1
+result_root: results/cr_sitta/o3_spatial_residual_v1
+parent_config: configs/p3_stage_b4_full_pilot64_proposal_gate_v1.yaml
+parent_config_sha256: dcc2436e8e6443e5731223a49d5e8c74e326cf50f9bd065195990085d8f46614
+parent_aggregate:
+  path: results/cr_sitta/p3_stage_b4_full_pilot64_proposal_gate_v1/aggregate_phase/R0
+  manifest_sha256: fd5f3d2df4abed1ee399f3298946a48a85ce00151d4d55b7f32a0d350c5e718c
+  complete_sha256: c52ea760401a9bdffee68f6de42b83906208c1ec615bb6fddd9d40bf0b01b30b
+addendum: configs/cr_sitta_o3_spatial_residual_v1_preregistration.md
+historical_export_only_drift:
+  tta/adapters/__init__.py:
+    historical_sha256: 0289b3f17b61da5dc48fc6d92731d2fe6a1dd07b8dcce7181545be56c41f603e
+    current_sha256: 078ac5abfcf5b77d6254ff8184115beed1fd7438609143ec7c60c68a07d82415
+  tta/objectives/__init__.py:
+    historical_sha256: 4f55167b3302528e72a53a757a949bf34dcdd04a70201db8440dde63dc7c1f84
+    current_sha256: 8f1335dc08765c5863f38a8cd68c432058b3e4deb946f632105ccacbaf360d57
+datasets: [IRSTD-1K, NUAA-SIRST, NUDT-SIRST]
+ordered_conditions:
+  - [clean, 0]
+  - [gaussian_noise, 1]
+  - [gaussian_noise, 3]
+  - [gaussian_noise, 5]
+  - [gaussian_blur, 1]
+  - [gaussian_blur, 3]
+  - [gaussian_blur, 5]
+  - [low_contrast, 1]
+  - [low_contrast, 3]
+  - [low_contrast, 5]
+  - [stripe_noise, 1]
+  - [stripe_noise, 3]
+  - [stripe_noise, 5]
+scope:
+  split_name: train
+  no_validation_split: true
+  new_validation_split: false
+  formal_test_allowed: false
+  full_source_training_allowed: false
+  paper_result: false
+  image_count_per_condition: 64
+  seed: 42
+  replicate: R0
+  all_candidates_complete_before_outer_targets: true
+candidate:
+  id: O3_DecoderSpatialResidual
+  objective: O3
+  teacher: sealed_source_identity
+  uncertainty: flip4
+  student_perturbation: mild_contrast_0p95
+  host_checkpoint_role: best_miou
+  host_checkpoint_source: frozen_parent_config
+  site: decoder_0_before_output_0
+  channels: 16
+  kernel_size: 3
+  groups: 16
+  trainable_scalars: 144
+  initialization: zero
+  max_residual_ratio: 0.05
+  rms_floor: 0.000001
+  absolute_radius: 0.25
+  relative_radius: null
+  host_frozen: true
+  host_features_detached: true
+  optimizer_objects: 0
+  single_proposal_per_image: true
+  reset_every_image: true
+  frozen_parent_loss_and_safety: true
+performance_criteria:
+  numerical_tolerance: 0.000000000001
+  gaussian_noise_family_iou_above_source: true
+  gaussian_blur_family_iou_above_source: true
+  low_contrast_family_iou_at_least_old_o3_p2: true
+  stripe_noise_family_iou_at_least_old_o3_p2: true
+  nonclean_macro_iou_above_old_o3_p2: true
+  nonclean_macro_pd_at_least_old_o3_p2: true
+  nonclean_macro_fa_at_most_source: true
+  each_clean_iou_pd_maximum_absolute_drop: 0.002
+  each_clean_fa_at_most_source: true
+  statistical_significance_claim: false
+outputs:
+  save_source_probabilities: true
+  save_post_probabilities: true
+  save_all_prediction_masks: true
+  prediction_threshold: 0.5
+  save_episode_kernel_and_gradient: true
+  save_all_39_cell_metrics: true
+  overwrite_existing_run: false
+implementation_files:
+  - tta/adapters/decoder_spatial_residual_v1.py
+  - tta/spatial_residual_episode_v1.py
+  - analysis/spatial_residual_contract_v1.py
+  - scripts/run_o3_spatial_residual_v1.py
+  - analysis/evaluate_o3_spatial_residual_v1.py
+  - tests/test_decoder_spatial_residual_v1.py
+  - tests/test_spatial_residual_episode_v1.py
+  - tests/test_spatial_residual_contract_v1.py
+  - tests/test_o3_spatial_residual_runner_v1.py
+  - tests/test_evaluate_o3_spatial_residual_v1.py
