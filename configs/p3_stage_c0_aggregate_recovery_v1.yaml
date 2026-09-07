@@ -1,0 +1,141 @@
+schema_version: 1
+protocol_id: cr-sitta-p3-stage-c0-aggregate-recovery-v1
+role: aggregate_only_postverify_erratum_recovery
+
+freeze:
+  state: frozen
+  mechanism: runner_constant_pins_exact_config_bytes_then_no_replace_freeze_receipt
+  pre_run_freeze_receipt: >-
+    results/cr_sitta/p3_stage_c0_aggregate_recovery_v1/PRE_RUN_FREEZE.json
+  print_hash_command: >-
+    python recover_p3_stage_c0_aggregate_v1.py print-config-sha256
+  freeze_command: >-
+    CUDA_VISIBLE_DEVICES= python recover_p3_stage_c0_aggregate_v1.py freeze
+  verify_config_command: >-
+    CUDA_VISIBLE_DEVICES= python recover_p3_stage_c0_aggregate_v1.py verify-config
+  verify_recovery_command: >-
+    CUDA_VISIBLE_DEVICES= python recover_p3_stage_c0_aggregate_v1.py verify
+
+parent_stage_c0_v2:
+  protocol_id: cr-sitta-p3-stage-c0-signal-audit-v2
+  config:
+    path: configs/p3_stage_c0_signal_audit_v2.yaml
+    bytes: 15311
+    sha256: be10f26359a218687f3d51ffd4aaeea56646c266e7d3862958682b2ccac54ce1
+  runner:
+    path: run_p3_stage_c0_signal_audit_v2.py
+    bytes: 160706
+    sha256: 1e3cdf272d0a4d239d47ff98580faa7547c2c81c7fe4fbf6e0eb43db749c44bd
+  pre_run_freeze:
+    path: results/cr_sitta/p3_stage_c0_signal_audit_v2/PRE_RUN_FREEZE.json
+    bytes: 10083
+    sha256: 15608a2d69bbd04ea0fb5be9d9e565285fa49aec409b737d1d775629d86d6a24
+  postverify_abort_receipt:
+    path: >-
+      results/cr_sitta/p3_stage_c0_signal_audit_v2/AGGREGATE_POSTVERIFY_ABORT_RECEIPT.json
+    bytes: 10252
+    sha256: 81266c924c8cbbbde00b8864f38094d941eff6aeee6b061dc8997457206b978e
+  science_gate:
+    config_path: configs/p3_stage_c_science_gate_v1.yaml
+    config_sha256: 2f9358f426cd927c57f465e348d53dccc1f7fba2e326a514804a1838496b22cd
+    module_path: analysis/stage_c_science_gate_v1.py
+    module_sha256: d5046f51e8d2d1a8add21e6a2ec8f71731557be660773ed682fdbf9b50205e46
+  artifact_ledgers:
+    serialization: sha256_of_canonical_json_without_trailing_newline
+    candidates:
+      IRSTD-1K:
+        path: results/cr_sitta/p3_stage_c0_signal_audit_v2/candidate_phase/R0/IRSTD-1K
+        file_count: 8
+        file_ledger_sha256: 952537f84ac34c12643304ffd9b7efea15393e2c39428176cdd3a8ecbf78fd3f
+      NUAA-SIRST:
+        path: results/cr_sitta/p3_stage_c0_signal_audit_v2/candidate_phase/R0/NUAA-SIRST
+        file_count: 8
+        file_ledger_sha256: d3b8d714e6a29c83088ab2147ac347ac17e4da6445816b2524c80778bed084af
+      NUDT-SIRST:
+        path: results/cr_sitta/p3_stage_c0_signal_audit_v2/candidate_phase/R0/NUDT-SIRST
+        file_count: 8
+        file_ledger_sha256: 8d24cd913104c29ea73ecbaf975eb525794b8c02c727648995edc3de71ff8c95
+    outers:
+      IRSTD-1K:
+        path: results/cr_sitta/p3_stage_c0_signal_audit_v2/outer_phase/R0/IRSTD-1K
+        file_count: 4
+        file_ledger_sha256: 2243328cd153452c1d132286c042ff7def7f0efc387d1810979a1272628a5286
+      NUAA-SIRST:
+        path: results/cr_sitta/p3_stage_c0_signal_audit_v2/outer_phase/R0/NUAA-SIRST
+        file_count: 4
+        file_ledger_sha256: d0d64fe4c61b4bc3a4ed2750c747900ffe012c477a99e85cfe7f0cd861ac7cc6
+      NUDT-SIRST:
+        path: results/cr_sitta/p3_stage_c0_signal_audit_v2/outer_phase/R0/NUDT-SIRST
+        file_count: 4
+        file_ledger_sha256: d9c1a02aff3126d09a7126d1c06e7d607af1926f6f82565c0ca361e44e49f61e
+    aggregate:
+      path: results/cr_sitta/p3_stage_c0_signal_audit_v2/aggregate_phase/R0
+      file_count: 5
+      file_ledger_sha256: 13435969d9b09369bb0edf845862087816e21431326d686f7119784b78a9a7f4
+
+incident:
+  original_command: >-
+    CUDA_VISIBLE_DEVICES= PYTHONDONTWRITEBYTECODE=1 ./.conda/bin/python
+    run_p3_stage_c0_signal_audit_v2.py --config
+    configs/p3_stage_c0_signal_audit_v2.yaml aggregate
+  original_exit_code: 2
+  terminal_error_type: StageC0ProtocolError
+  terminal_error_message: aggregate authorization differs
+  original_v2_runner_self_verification_passed: false
+  original_aggregate_must_not_be_described_as_v2_verified: true
+
+repair:
+  failure_class: python_tuple_vs_json_array_postserialization_comparison
+  exact_json_path: $.parameter_space_ids
+  producer_python_container_type: tuple
+  stored_json_container_type: list
+  allowed_adapter: recursive_mapping_to_dict_and_tuple_or_list_to_list
+  adapter_scope: StageCAuthorization_serialization_projection_only
+  canonical_semantic_hash_algorithm: sha256_of_canonical_json_without_trailing_newline
+  require_canonical_semantic_hash_equality: true
+  require_unadapted_v2_verifier_terminal_error_first: true
+  require_adapted_full_v2_verifier_success: true
+  thresholds_changed: false
+  coverage_changed: false
+  data_changed: false
+  statistics_changed: false
+
+scientific_boundary:
+  required_scientific_status: scientific_no_eligible
+  stage_c1_authorized: false
+  stage_c1_started: false
+  stage_c_r1_r2_authorized: false
+  stage_c_r1_r2_started: false
+  formal_test_authorized: false
+  formal_test_started: false
+  no_validation_split: true
+  validation_payload_opens: 0
+  test_payload_opens: 0
+  raw_source_image_payload_opens: 0
+  raw_source_target_payload_deserializations: 0
+  completed_evidence_artifact_reads_only: true
+
+execution:
+  device: cpu
+  cuda_visible_devices: empty_string_required
+  cuda_initialized: forbidden
+  model_construction: forbidden
+  optimizer_construction: forbidden
+  candidate_selection: forbidden
+  new_candidate_or_outer_execution: forbidden
+
+output:
+  root: results/cr_sitta/p3_stage_c0_aggregate_recovery_v1
+  recovery_verified_receipt: RECOVERY_VERIFIED_RECEIPT.json
+  atomic_no_replace: true
+  refuse_overwrite: true
+  immutable_mode: "0444"
+
+implementation:
+  critical_code_paths:
+    - recover_p3_stage_c0_aggregate_v1.py
+    - run_p3_stage_c0_signal_audit_v2.py
+    - analysis/stage_c_science_gate_v1.py
+    - configs/p3_stage_c_science_gate_v1.yaml
+    - tta/d0_secure_io.py
+  path_order_is_frozen: true

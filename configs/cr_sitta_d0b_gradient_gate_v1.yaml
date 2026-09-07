@@ -1,0 +1,369 @@
+schema_version: 1
+protocol_id: cr-sitta-d0b-checkpoint-rebound-gradient-gate-v1
+created_at: "2026-09-04"
+
+# D0-B is a train-only mechanism audit.  It is deliberately not a test or
+# validation run and it cannot authorize either one.
+scope:
+  method_name: CR-SITTA
+  method_stage: D0-B
+  data_role: train
+  split_role: frozen_Pilot64
+  no_validation_split: true
+  development_only: true
+  paper_result: false
+  use_validation_payload: false
+  use_test_payload: false
+  validation_access_count: 0
+  test_access_count: 0
+  pilot_image_count_per_dataset: 64
+  dataset_count: 3
+  condition_count_per_dataset: 13
+  probe_count: 2
+  parameter_space_count: 3
+  expected_candidate_episode_count_per_dataset: 1664
+  expected_outer_episode_count_per_dataset: 1664
+  expected_nonclean_probe_episode_count_total: 4608
+  seed: 42
+
+freeze:
+  pre_run_receipt: >-
+    results/cr_sitta/d0b_checkpoint_rebound_gradient_gate_v1/PRE_RUN_FREEZE.json
+  atomic_no_replace: true
+  refuse_overwrite: true
+  require_all_three_safe_exports_before_freeze: true
+  require_formal_phase_directories_absent: true
+
+lineage:
+  design_document:
+    path: CR-SITTA_StageC0负结果后的训练兼容化方案与门控_v7.md
+    sha256: a4e6a1cedf19ecd5404f9e7e112267ded898212b533fb7e6027a95a6ee083175
+  old_c0_negative_result:
+    path: results/cr_sitta/stage_c0_r0_negative_v1/NEGATIVE_RESULT.json
+    sha256: 6db42aa4e92c4e3d3351104a67a3483fa9106dc994d4eb0e4a139b4a8dccede7
+  d0a_full_train_freeze:
+    path: results/cr_sitta/d0a_supervised_lfhf_train_v2/FULL_TRAIN_FREEZE.json
+    sha256: fa164bcf33185656c1eeb5bbcc0cbcd752c59dbeab37b0a82fe64cfaa6446bca
+  prior_c0_logic:
+    path: run_p3_stage_c0_signal_audit_v2.py
+    sha256: 1e3cdf272d0a4d239d47ff98580faa7547c2c81c7fe4fbf6e0eb43db749c44bd
+    reuse_scope: formulas_and_verified_execution_logic_only
+    numeric_artifact_reuse: forbidden
+  pure_science_gate:
+    module_path: analysis/stage_c_science_gate_v1.py
+    module_sha256: d5046f51e8d2d1a8add21e6a2ec8f71731557be660773ed682fdbf9b50205e46
+    config_path: configs/p3_stage_c_science_gate_v1.yaml
+    config_sha256: 2f9358f426cd927c57f465e348d53dccc1f7fba2e326a514804a1838496b22cd
+
+artifact_policy:
+  checkpoint_dependent_artifacts_must_be_rebuilt:
+    - strong_teacher
+    - candidate_masks_and_region_weights
+    - source_probabilities
+    - proxy_gradients
+    - outer_task_gradients
+    - aggregate_evidence
+  forbidden_input_roots:
+    - results/cr_sitta/nonadaptive_teacher_screen_v1
+    - results/cr_sitta/p3_stage_c0_signal_audit_v1
+    - results/cr_sitta/p3_stage_c0_signal_audit_v2
+    - results/cr_sitta/p3_stage_c0_aggregate_recovery_v1
+    - results/retraining_fixed_split
+    - results/baseline
+  permitted_reuse:
+    artifact: image_only_13_condition_Pilot64_cache
+    checkpoint_independent_proof_required: true
+    rehash_and_rebind_in_pre_run_freeze: true
+  authorization_output: D1_AUTHORIZATION.json
+  forbidden_authorization_fields:
+    - stage_c1_allowed
+    - stage_c_r1_r2_allowed
+    - formal_test_authorized
+  may_authorize_only: D1_train_internal_OOF
+  formal_test_allowed: false
+
+frozen_formula_bindings:
+  pilot_protocol:
+    path: configs/tta_train_side_calibration_pilot_v2.yaml
+    sha256: 3a35f2107786815ef8e7b053e1c220406f9bf2d095f59bccdc5822e16be9ab96
+  pilot_manifest:
+    path: configs/tta_train_side_pilot_v2/manifest.json
+    sha256: 99b1ee706fc57813b473039513566566ba2e6a065663be122c260edf9ef6dfb1
+  cache_protocol:
+    path: configs/binary_tent_ss_calibration_cache_v2.yaml
+    sha256: e225311cce252125eaf3a2b47eeeea4cde60d0363c8c71f48494d70e41c2aa3e
+  probe_seed_namespace: cr-sitta-p3-stage-c0-signal-audit-v1
+  probe_seed_fields:
+    - protocol_id
+    - global_seed
+    - canonical_image_id
+    - probe_id
+    - method_facing_input_tensor_sha256
+
+datasets:
+  IRSTD-1K:
+    root: datasets/IRSTD-1K
+    train_split: datasets/IRSTD-1K/img_idx/train_IRSTD-1K.txt
+    train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+    pilot_ids: configs/tta_train_side_pilot_v2/IRSTD-1K.txt
+    pilot_ids_file_sha256: b66b914ac8a2177a127a2363245c82df29395f97dfe0745c802fd7211f3b988e
+    ordered_pilot64_image_ids_sha256: 0ee4400c021dcfb639d813bc20582060a3fff8bb635292e48abf820ce90abb13
+    checkpoint_role: epoch_1000_train_only_safe
+    checkpoint_path: >-
+      results/cr_sitta/d0a_supervised_lfhf_train_v2/IRSTD-1K/epoch_1000_train_only_safe.pth.tar
+    safe_export_receipt: >-
+      results/cr_sitta/d0a_supervised_lfhf_train_v2/IRSTD-1K/SAFE_EXPORT.json
+    cache_root: results/binary_tent/ss_calibration_cache_v2/IRSTD-1K
+    cache_content_sha256: f3ff4c7b60d53ac1ec553a1b35f6a947be6e2da264a893ef4dff2cce513774c1
+    cache_manifest_sha256: 95d0ee45ccf2f221eea042f96c3bfd3e25dcc736286482ad21f2591176651db6
+    cache_method_manifest_sha256: 2144bc9f0e05e38d81c73c0b4a7fa85784c5836f88ea54ddd727e447e7689072
+    cache_complete_sha256: d558459dc6387e45eb0ce64e2e3a9ae773613570f9871b3b9abe97d85121e0f8
+    teacher_root: >-
+      results/cr_sitta/d0b_checkpoint_rebound_gradient_gate_v1/teacher_phase/R0/IRSTD-1K
+  NUAA-SIRST:
+    root: datasets/NUAA-SIRST
+    train_split: datasets/NUAA-SIRST/img_idx/train_NUAA-SIRST.txt
+    train_split_sha256: 324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4
+    pilot_ids: configs/tta_train_side_pilot_v2/NUAA-SIRST.txt
+    pilot_ids_file_sha256: f15f46a4f095689e126391973b1a8a216ffcb8c6330e4f348defe691ee3a369f
+    ordered_pilot64_image_ids_sha256: a48e5e3f0ec3e6911a74f953e96aa7ea362b2f2f32c37626099afd61f4935baa
+    checkpoint_role: epoch_1000_train_only_safe
+    checkpoint_path: >-
+      results/cr_sitta/d0a_supervised_lfhf_train_v2/NUAA-SIRST/epoch_1000_train_only_safe.pth.tar
+    safe_export_receipt: >-
+      results/cr_sitta/d0a_supervised_lfhf_train_v2/NUAA-SIRST/SAFE_EXPORT.json
+    cache_root: results/binary_tent/ss_calibration_cache_v2/NUAA-SIRST
+    cache_content_sha256: 0606f8e0f420ad2e268b3dc873e4966b1ab9f2569d85115cfa1dd5863dfc0d12
+    cache_manifest_sha256: aef94b27929a80cf8b05174862cc688d844a9016867cbee0c9751f105229a76d
+    cache_method_manifest_sha256: 5099ea261f977bfabac73283f3b4c6585a50cdab1092a6cce7f31ef31c3adcaa
+    cache_complete_sha256: 171ac30c25ad5a5c8039b7edf82b584c1a180845503c35f85f0175ba58c673f1
+    teacher_root: >-
+      results/cr_sitta/d0b_checkpoint_rebound_gradient_gate_v1/teacher_phase/R0/NUAA-SIRST
+  NUDT-SIRST:
+    root: datasets/NUDT-SIRST
+    train_split: datasets/NUDT-SIRST/img_idx/train_NUDT-SIRST.txt
+    train_split_sha256: e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3
+    pilot_ids: configs/tta_train_side_pilot_v2/NUDT-SIRST.txt
+    pilot_ids_file_sha256: c9eebc3a23f94d0c01bd56a21c7a58475947fa53b72021d05668b1a901ded74b
+    ordered_pilot64_image_ids_sha256: 5c6c8b441eab5277611fa1007354692df557db311e2d7969e34ebeaba3ae00e4
+    checkpoint_role: epoch_1000_train_only_safe
+    checkpoint_path: >-
+      results/cr_sitta/d0a_supervised_lfhf_train_v2/NUDT-SIRST/epoch_1000_train_only_safe.pth.tar
+    safe_export_receipt: >-
+      results/cr_sitta/d0a_supervised_lfhf_train_v2/NUDT-SIRST/SAFE_EXPORT.json
+    cache_root: results/binary_tent/ss_calibration_cache_v2/NUDT-SIRST
+    cache_content_sha256: 3e9ed0cac6bc5e7257d0d5106c85352c783f302c4e949bd802ec1d5e707740d9
+    cache_manifest_sha256: bc9ac2caee9647365f58cf21fea30558295889adbb68b8c560779bcc73959e25
+    cache_method_manifest_sha256: 02b281fa8ed08906f6b4eab2525b86fc9c45c060d162e9c479cb61dac04f1b8d
+    cache_complete_sha256: 835c873f9d575b31e0947aecb9f8cfa2fc020832c0ab0317db7657e4ec484125
+    teacher_root: >-
+      results/cr_sitta/d0b_checkpoint_rebound_gradient_gate_v1/teacher_phase/R0/NUDT-SIRST
+
+ordered_conditions:
+  - [clean, 0]
+  - [gaussian_noise, 1]
+  - [gaussian_noise, 3]
+  - [gaussian_noise, 5]
+  - [gaussian_blur, 1]
+  - [gaussian_blur, 3]
+  - [gaussian_blur, 5]
+  - [low_contrast, 1]
+  - [low_contrast, 3]
+  - [low_contrast, 5]
+  - [stripe_noise, 1]
+  - [stripe_noise, 3]
+  - [stripe_noise, 5]
+
+teacher:
+  source: freshly_rebuilt_from_each_d0a_epoch1000_safe_checkpoint
+  array_name: base_view_probabilities
+  accepted_view_names: [identity, hflip, vflip, hvflip]
+  accepted_view_indices: [0, 1, 2, 3]
+  stored_view_names: [identity, hflip, vflip, hvflip, context_tile]
+  aggregation: median
+  detached_required: true
+  probability_eps: 1.0e-6
+  variance_threshold: 0.01
+  target_threshold: 0.10
+  background_threshold: 0.01
+  uncertainty_temperature: 0.01
+  protection_radius: 3
+  candidate_threshold: 0.50
+  candidate_min_area: 1
+  ring_inner_radius: 3
+  ring_outer_radius: 7
+  local_contrast_radius: 3
+
+deterioration_bank:
+  input_space: physical_RGB_0_1_before_ImageNet_normalization
+  every_probe_runs_for_every_condition: true
+  benchmark_condition_name_available_to_probe: false
+  benchmark_severity_available_to_probe: false
+  probe_seed_namespace: cr-sitta-p3-stage-c0-signal-audit-v1
+  probes:
+    - id: lf_mask
+      kind: low_frequency_amplitude_mask
+      mask_ratio: 0.20
+      keep_probability: 0.50
+    - id: hf_noise
+      kind: high_frequency_noise
+      target_rms: 0.02
+      low_cut_ratio: 0.20
+
+objective:
+  name: active_region_balanced_bootstrap_plus_local_contrast
+  entropy_margin: 0.01
+  min_active_pixels: 1
+  probability_eps: 1.0e-6
+  lambda_foreground: 1.0
+  lambda_background: 1.0
+  lambda_local_contrast: 0.10
+  lambda_router_l2: 0.0
+  lambda_router_spatial_tv: 0.0
+  candidate_weighting: equal_per_candidate_sum_to_one
+  empty_candidate_weight: empty_tensor
+  local_contrast_temperature: 0.25
+  local_contrast_ring_weight: 1.0
+  local_contrast_huber_delta: 1.0
+  foreground_background_separately_normalized: true
+
+parameter_spaces:
+  R-E1:
+    type: spatial_low_rank_film
+    insertion: fpn_x_e1
+    channels: 64
+    rank: 4
+    grid_size: [8, 8]
+    max_scale_delta: 0.05
+    max_bias: 0.05
+    expected_parameter_tensor_count: 2
+    expected_scalar_parameter_count: 512
+    normalized_virtual_step_l2_radius: 0.25
+  R-D0:
+    type: spatial_low_rank_film
+    insertion: decoder_x_d0
+    channels: 16
+    rank: 2
+    grid_size: [8, 8]
+    max_scale_delta: 0.05
+    max_bias: 0.05
+    expected_parameter_tensor_count: 2
+    expected_scalar_parameter_count: 256
+    normalized_virtual_step_l2_radius: 0.25
+  P2:
+    type: bn_affine
+    group_spec: decoder_low
+    expected_parameter_tensor_count: 16
+    expected_scalar_parameter_count: 416
+    normalized_virtual_step_radius_mode: relative_to_source_parameter_l2
+    normalized_virtual_step_relative_radius: 0.0005
+  ordered: [R-E1, R-D0, P2]
+  router_basis_seed: 3407
+
+outer_oracle_task_loss:
+  role: train_only_pilot64_outer_evaluator_gradient_alignment
+  used_by_adaptation: false
+  lambda_bce: 1.0
+  lambda_soft_iou: 1.0
+  eps: 1.0e-6
+  bce_reduction: mean_over_all_pixels
+  soft_iou_reduction: mean_over_sample
+  empty_target_convention: epsilon_smoothed_union_penalizes_foreground
+  normalized_virtual_step:
+    direction: negative_proxy_gradient
+    nonzero_epsilon: 1.0e-12
+    threshold_crossing_probability: 0.5
+    threshold_rule: strict_greater_than
+    threshold_crossing_role: report_only_not_stage_c0_hard_gate
+
+stage_c0_signal_gate:
+  mechanism_id: ASB-SFR_C0
+  dataset_ids: [IRSTD-1K, NUAA-SIRST, NUDT-SIRST]
+  family_ids: [gaussian_noise, gaussian_blur, low_contrast, stripe_noise]
+  space_ids: [R-E1, R-D0, P2]
+  space_virtual_step_contracts:
+    R-E1:
+      radius_mode: absolute_l2
+      radius_value: 0.25
+      nonzero_epsilon: 1.0e-12
+      direction: negative_proxy_gradient
+      clip_rule: min_1_radius_over_norm_plus_epsilon
+    R-D0:
+      radius_mode: absolute_l2
+      radius_value: 0.25
+      nonzero_epsilon: 1.0e-12
+      direction: negative_proxy_gradient
+      clip_rule: min_1_radius_over_norm_plus_epsilon
+    P2:
+      radius_mode: relative_to_source_parameter_l2
+      radius_value: 0.0005
+      nonzero_epsilon: 1.0e-12
+      direction: negative_proxy_gradient
+      clip_rule: min_1_radius_over_norm_plus_epsilon
+  expected_nonclean_probe_episode_count: 4608
+  expected_nonclean_probe_episode_count_per_dataset: 1536
+  expected_nonclean_probe_episode_count_per_family: 1152
+  expected_identity_comparison_count_per_space: 192
+  minimum_nonclean_finite_nonzero_proxy_gradient_fraction: 0.80
+  minimum_nonclean_active_support_episode_fraction: 0.30
+  minimum_candidate_proximal_active_episode_fraction_among_active: 0.05
+  dataset_cosine_strictly_greater_than: 0.0
+  minimum_positive_dataset_cosines: 2
+  macro_cosine_strictly_greater_than: 0.08
+  virtual_task_derivative_improvement_relation: strictly_less_than_zero
+  minimum_improving_families: 3
+  require_identity_bit_exact: true
+  filter_before_reporting_eligible_spaces: true
+  zero_signal_spaces_eligible: false
+
+implementation:
+  # All are hashed into PRE_RUN_FREEZE.  The old runner is execution logic,
+  # never an input artifact; its hash is additionally pinned above.
+  critical_code_paths:
+    - run_cr_sitta_d0b_gradient_gate_v1.py
+    - analysis/cr_sitta_d0b_gate.py
+    - export_cr_sitta_d0a_safe_checkpoint.py
+    - run_p3_stage_c0_signal_audit_v2.py
+    - analysis/stage_c_science_gate_v1.py
+    - analysis/stage_c0_teacher_student_gap.py
+    - analysis/stage_c0_active_support.py
+    - analysis/stage_c0_group_alignment.py
+    - analysis/d0_v2_task_loss.py
+    - analysis/source_train_provenance.py
+    - dataio/train_side_pilot_protocol.py
+    - materialize_binary_tent_ss_calibration_cache_v2.py
+    - model/MSHNet_NSFPN.py
+    - model/MSHNet_NSFPN_adaptable.py
+    - model/NS_FPN.py
+    - model/diff_cross_attns.py
+    - SFS_MSDeformAttn/ops/functions/ms_deform_attn_func.py
+    - SFS_MSDeformAttn/ops/modules/ms_deform_attn.py
+    - .conda/lib/python3.10/site-packages/MultiScaleDeformableAttention.cpython-310-x86_64-linux-gnu.so
+    - metrics/connected_components.py
+    - test_source.py
+    - tta/model_adapter.py
+    - tta/adapters/nsfpn_router_adapter.py
+    - tta/adapters/spatial_low_rank_film.py
+    - tta/deteriorations/fourier_low_mask.py
+    - tta/deteriorations/high_frequency_noise.py
+    - tta/deteriorations/image_space.py
+    - tta/stage_c0_method_input.py
+    - tta/teachers/strong_view_teacher.py
+    - tta/proposals/source_multiview_teacher.py
+    - tta/objectives/active_bootstrap.py
+    - tta/objectives/_validation.py
+    - tta/objectives/asb_sfr.py
+    - tta/objectives/local_contrast_consistency.py
+    - tta/objectives/router_regularization.py
+    - tta/parameter_groups.py
+    - tta/d0_secure_io.py
+    - configs/p3_stage_c_science_gate_v1.yaml
+
+output:
+  root: results/cr_sitta/d0b_checkpoint_rebound_gradient_gate_v1
+  teacher_phase: teacher_phase/R0
+  candidate_phase: candidate_phase/R0
+  outer_phase: outer_phase/R0
+  aggregate_phase: aggregate_phase/R0
+  atomic_no_replace: true
+  refuse_overwrite: true

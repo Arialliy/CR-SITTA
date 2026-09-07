@@ -1,0 +1,94 @@
+schema_version: 3
+registry_id: cr-sitta-artifact-eligibility-registry-v3
+status: frozen_append_only_declaration
+supersedes: cr-sitta-artifact-eligibility-registry-v2
+
+parent_registry:
+  registry_id: cr-sitta-artifact-eligibility-registry-v2
+  config_path: configs/artifact_eligibility_registry_v2.yaml
+  config_sha256: 9ca4060f54ca43c9bd5bf2a127f862e03d35f6ceb7f83fa37f432034e65d35fc
+  materialized_path: results/artifact_eligibility_registry_v2.json
+  materialized_sha256: 1fc6d0e341c54934381ea2c14f940fddb3d05b68a026f271cb9684355b365267
+  generator_path: scripts/validate_result_eligibility_v2.py
+  generator_sha256: 35c296d045c229b307d32d9f84640c31e2026d7bcafde11836a6fdedc15a8499
+  eligibility_module_path: metrics/result_eligibility_v2.py
+  eligibility_module_sha256: eadd43e5942560d4471d06de4de634b4d11707c5add7f9de8955b357a1cb3e4c
+  artifact_count: 14
+  append_only: true
+
+policies:
+  official_split_model: train_test_only
+  validation_split_created: false
+  main_paper_requires_no_test_selection: true
+  existing_artifacts_are_immutable: true
+  append_only_parent_required: true
+
+implementation_deviation:
+  source_document: CR-SITTA_StageB4负结果后的StageC方案与代码修改_v6.md
+  source_document_sha256: c8f360226bf123035d6fbb27096ce4f4e96f443cc81db92a35f994ac187b3e7a
+  source_section: "7.1"
+  requested_registry_action: update_configs_artifact_eligibility_registry_v1_yaml
+  implemented_registry_action: append_new_v3_declaration_with_v2_parent
+  reason: >-
+    Registry v2 already binds registry v1 as an immutable parent by SHA-256.
+    Updating v1 would invalidate that published provenance chain, so C-0 is
+    registered by an append-only v3 declaration instead.
+  preserved_parent_bindings:
+    v1_config_path: configs/artifact_eligibility_registry_v1.yaml
+    v1_config_sha256: c6643daa675b0c8b74a7b8fff85d3a64563e77772934d517d61205dd15621956
+    v2_config_path: configs/artifact_eligibility_registry_v2.yaml
+    v2_config_sha256: 9ca4060f54ca43c9bd5bf2a127f862e03d35f6ceb7f83fa37f432034e65d35fc
+
+artifacts:
+  - artifact_id: cr_sitta_stage_b4_r0_negative_archive_v1
+    root: results/cr_sitta/stage_b4_r0_negative_v1
+    artifact_role: stage_b4_r0_negative_result_audit_nonpaper
+    identity:
+      mode: full_tree
+      algorithm: sorted-root-relative-path-tab-sha256-tab-size-lf-v1
+      expected_sha256: 13333b1fc549d672650a462a7ff809e9fcf425540e31f019e6a305abd65bdf42
+      file_count: 6
+      total_size_bytes: 51244
+    artifact_complete: true
+    formal_protocol_complete: false
+    source_stage_b4_protocol_complete: true
+    scientific_eligibility:
+      tier: development_test_selected
+      main_paper_table: false
+      reason_codes:
+        - source_checkpoint_test_selected
+        - stage_b4_r0_scientific_no_eligible
+        - no_candidate_selected_for_r1_r2
+        - stage_b5_not_allowed
+        - full_cr_sitta_not_evaluated
+        - negative_result_for_method_redesign_only
+        - archive_formal_completion_seal_absent
+    selection:
+      source_checkpoint_role: best_miou
+      checkpoint_selection_split: test
+      tta_calibration_split: train
+      test_used_for_checkpoint_selection: true
+      test_used_for_tta_selection: false
+    data_boundary:
+      no_validation_split: true
+      candidate_split: train
+      outer_target_split: train
+      validation_image_access_count: 0
+      validation_mask_access_count: 0
+      test_image_access_count: 0
+      test_mask_access_count: 0
+      adaptation_gradient_uses_labels: false
+    source_decision:
+      protocol_status: passed
+      scientific_status: scientific_no_eligible
+      selected_for_r1_r2: []
+      stage_b5_allowed: false
+      full_cr_sitta_evaluated: false
+    notes: >-
+      Six-file append-only C-0 archive of the completed Stage B4 R0 negative
+      decision. The source Stage B4 protocol completed, but this derived archive
+      has no independent manifest/completion seal and is therefore registered
+      by an exact full-tree identity with formal_protocol_complete=false. It is
+      excluded from every main-paper result table; the upstream best_miou
+      checkpoints were selected on the fixed test split even though Stage B4
+      itself opened no validation or test image/mask payload.

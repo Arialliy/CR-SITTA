@@ -1,0 +1,355 @@
+schema_version: 1
+protocol_id: cr-sitta-p3-stage-c0-signal-audit-v2
+created_at: "2026-09-04"
+
+freeze:
+  state: frozen
+  mechanism: runner_constant_pins_exact_config_bytes
+  self_hash_field: forbidden_avoids_recursive_hash
+  pre_run_freeze_receipt: >-
+    results/cr_sitta/p3_stage_c0_signal_audit_v2/PRE_RUN_FREEZE.json
+  freeze_command: >-
+    python run_p3_stage_c0_signal_audit_v2.py freeze
+  verify_command: >-
+    python run_p3_stage_c0_signal_audit_v2.py verify-config
+  print_hash_command: >-
+    python run_p3_stage_c0_signal_audit_v2.py print-config-sha256
+
+revision_lineage:
+  predecessor_protocol_id: cr-sitta-p3-stage-c0-signal-audit-v1
+  predecessor_config:
+    path: configs/p3_stage_c0_signal_audit_v1.yaml
+    sha256: 785efe100797e25af776361e048ba3569349a1b925b50993a4f96abdec92358c
+  predecessor_runner:
+    path: run_p3_stage_c0_signal_audit_v1.py
+    sha256: 115aaa85fc584c41f857ea5b09a3bda860589dd72b685ac5cb6932edb3c612a3
+  predecessor_pre_run_freeze:
+    path: results/cr_sitta/p3_stage_c0_signal_audit_v1/PRE_RUN_FREEZE.json
+    sha256: 171755ea6df470227c98da11e2f358cf7dce486e3c45506ce38ae7ced91531cf
+  predecessor_abort_receipt:
+    path: results/cr_sitta/p3_stage_c0_signal_audit_v1/ABORTED_ENGINEERING_RECEIPT.json
+    sha256: 9c12255a7e650509dc1505369cd22b8a5197cd63fff295d690e82840168b1b52
+  failed_engineering_artifact:
+    manifest_path: results/cr_sitta/p3_stage_c0_signal_audit_v1/engineering_smoke/gpu_smoke_v1/candidate/IRSTD-1K/manifest.json
+    manifest_sha256: 8dd9cdde13e8914f33e8d8775f357652a31af097b27edc3ab8f8d24f3a3d8207
+    complete_path: results/cr_sitta/p3_stage_c0_signal_audit_v1/engineering_smoke/gpu_smoke_v1/candidate/IRSTD-1K/COMPLETE.json
+    complete_sha256: 4631359c089ea08717ff4ff30aef50665a29c3f9c3932215e2497eea25b7904c
+  failure_reason_code: canonical_json_mapping_order_mismatch
+  repaired_scope: canonical_json_mapping_roster_validation_only
+  formal_execution_started: false
+  science_contract_changed: false
+  science_gate_changed: false
+
+scope:
+  stage: P3_stage_c0_train_only_signal_audit
+  source_train_derived: true
+  split_name: train
+  split_role: frozen_pilot64
+  pilot_image_count_per_dataset: 64
+  dataset_count: 3
+  condition_count_per_dataset: 13
+  probe_count: 2
+  parameter_space_count: 3
+  label_free_probe_episode_count_per_dataset: 1664
+  outer_probe_episode_count_per_dataset: 1664
+  target_payload_deserialization_count_per_dataset: 1
+  unique_image_condition_target_uses_per_dataset: 832
+  probe_episode_target_uses_per_dataset: 1664
+  replicate_ids: [R0]
+  seed: 42
+  development_only: true
+  paper_result: false
+  paper_test_result: false
+  no_validation_split: true
+  use_validation_payload: false
+  use_test_payload: false
+  method_label_accesses: 0
+  candidate_outer_target_loader_module_imports: 0
+  candidate_target_payload_deserializations: 0
+  adaptation_gradient_uses_labels: false
+  outer_train_target_access_after_candidate_completion_only: true
+  upstream_checkpoint_selection_disclosure: >-
+    best_miou is test-selected under the earlier user-specified 1000-epoch
+    baseline training protocol; it is not a validation-selected checkpoint.
+
+stage_transition:
+  predecessor: P3_stage_b4_full_pilot64_proposal_gate_R0
+  predecessor_protocol_complete: true
+  predecessor_scientific_status: scientific_no_eligible
+  predecessor_stage_b5_allowed: false
+  stage_c0_is_new_development_hypothesis: true
+  stage_c1_allowed_before_c0_gate: false
+  formal_test_allowed_by_c0: false
+
+frozen_parent_bindings:
+  design_document:
+    path: CR-SITTA_StageB4负结果后的StageC方案与代码修改_v6.md
+    sha256: c8f360226bf123035d6fbb27096ce4f4e96f443cc81db92a35f994ac187b3e7a
+  train_pilot_protocol:
+    path: configs/tta_train_side_calibration_pilot_v2.yaml
+    sha256: 3a35f2107786815ef8e7b053e1c220406f9bf2d095f59bccdc5822e16be9ab96
+  train_pilot_manifest:
+    path: configs/tta_train_side_pilot_v2/manifest.json
+    sha256: 99b1ee706fc57813b473039513566566ba2e6a065663be122c260edf9ef6dfb1
+  cache_protocol:
+    path: configs/binary_tent_ss_calibration_cache_v2.yaml
+    sha256: e225311cce252125eaf3a2b47eeeea4cde60d0363c8c71f48494d70e41c2aa3e
+  geometric_view_library:
+    path: configs/irstd_view_library_v1.yaml
+    sha256: ce88436788036ae5d59ffbf2605135ecd9848044816ff3db8ffc603e9669f2d5
+  stage_b4_manifest:
+    path: results/cr_sitta/p3_stage_b4_full_pilot64_proposal_gate_v1/aggregate_phase/R0/manifest.json
+    sha256: fd5f3d2df4abed1ee399f3298946a48a85ce00151d4d55b7f32a0d350c5e718c
+  stage_b4_complete:
+    path: results/cr_sitta/p3_stage_b4_full_pilot64_proposal_gate_v1/aggregate_phase/R0/COMPLETE.json
+    sha256: c52ea760401a9bdffee68f6de42b83906208c1ec615bb6fddd9d40bf0b01b30b
+  stage_b4_science_decision:
+    path: results/cr_sitta/p3_stage_b4_full_pilot64_proposal_gate_v1/aggregate_phase/R0/science_decision_receipt.json
+    sha256: 705f8b4c1b0422234ae08b1b9431ed98807982aa7d0da1cea028c5ac8d73e678
+
+datasets:
+  IRSTD-1K:
+    root: datasets/IRSTD-1K
+    train_split: datasets/IRSTD-1K/img_idx/train_IRSTD-1K.txt
+    train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+    pilot_ids: configs/tta_train_side_pilot_v2/IRSTD-1K.txt
+    pilot_ids_file_sha256: b66b914ac8a2177a127a2363245c82df29395f97dfe0745c802fd7211f3b988e
+    ordered_pilot64_image_ids_sha256: 0ee4400c021dcfb639d813bc20582060a3fff8bb635292e48abf820ce90abb13
+    checkpoint_role: best_miou
+    checkpoint_path: results/retraining_fixed_split/IRSTD-1K/best_miou.pth.tar
+    checkpoint_sha256: ee8d5c3af67d7c93ff6be25b169bd8fd59afcd776afd173b4e230ad8dc8aa8b2
+    cache_root: results/binary_tent/ss_calibration_cache_v2/IRSTD-1K
+    cache_content_sha256: f3ff4c7b60d53ac1ec553a1b35f6a947be6e2da264a893ef4dff2cce513774c1
+    cache_manifest_sha256: 95d0ee45ccf2f221eea042f96c3bfd3e25dcc736286482ad21f2591176651db6
+    cache_method_manifest_sha256: 2144bc9f0e05e38d81c73c0b4a7fa85784c5836f88ea54ddd727e447e7689072
+    cache_complete_sha256: d558459dc6387e45eb0ce64e2e3a9ae773613570f9871b3b9abe97d85121e0f8
+    teacher_root: results/cr_sitta/nonadaptive_teacher_screen_v1/candidate_phase/IRSTD-1K
+    teacher_manifest_sha256: 42aa8ffbb85a53b57851a69e1a1c8c2094f202833532917ff7e01158fbfcc1fd
+    teacher_complete_sha256: 63f401faa207045183728763348058a4aab185cd9a6f77a46b7cebd1c4ed2148
+  NUAA-SIRST:
+    root: datasets/NUAA-SIRST
+    train_split: datasets/NUAA-SIRST/img_idx/train_NUAA-SIRST.txt
+    train_split_sha256: 324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4
+    pilot_ids: configs/tta_train_side_pilot_v2/NUAA-SIRST.txt
+    pilot_ids_file_sha256: f15f46a4f095689e126391973b1a8a216ffcb8c6330e4f348defe691ee3a369f
+    ordered_pilot64_image_ids_sha256: a48e5e3f0ec3e6911a74f953e96aa7ea362b2f2f32c37626099afd61f4935baa
+    checkpoint_role: best_miou
+    checkpoint_path: results/retraining_fixed_split/NUAA-SIRST/best_miou.pth.tar
+    checkpoint_sha256: 23feea50a847cdfc9874fe67d338a3884d9afa75d7a27b9b71a62ff2d00379cf
+    cache_root: results/binary_tent/ss_calibration_cache_v2/NUAA-SIRST
+    cache_content_sha256: 0606f8e0f420ad2e268b3dc873e4966b1ab9f2569d85115cfa1dd5863dfc0d12
+    cache_manifest_sha256: aef94b27929a80cf8b05174862cc688d844a9016867cbee0c9751f105229a76d
+    cache_method_manifest_sha256: 5099ea261f977bfabac73283f3b4c6585a50cdab1092a6cce7f31ef31c3adcaa
+    cache_complete_sha256: 171ac30c25ad5a5c8039b7edf82b584c1a180845503c35f85f0175ba58c673f1
+    teacher_root: results/cr_sitta/nonadaptive_teacher_screen_v1/candidate_phase/NUAA-SIRST
+    teacher_manifest_sha256: b360567e6d6546d0da998c251a74e7255e19fa6d513bf7ee81dec92ab92bc101
+    teacher_complete_sha256: 6e9a915ddcbf26f21d83b161b8735c61651c885301337f99341f2d35b46fcf6b
+  NUDT-SIRST:
+    root: datasets/NUDT-SIRST
+    train_split: datasets/NUDT-SIRST/img_idx/train_NUDT-SIRST.txt
+    train_split_sha256: e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3
+    pilot_ids: configs/tta_train_side_pilot_v2/NUDT-SIRST.txt
+    pilot_ids_file_sha256: c9eebc3a23f94d0c01bd56a21c7a58475947fa53b72021d05668b1a901ded74b
+    ordered_pilot64_image_ids_sha256: 5c6c8b441eab5277611fa1007354692df557db311e2d7969e34ebeaba3ae00e4
+    checkpoint_role: best_miou
+    checkpoint_path: results/retraining_fixed_split/NUDT-SIRST/best_miou.pth.tar
+    checkpoint_sha256: a67d3a7e2597d201e1fecf32b7f218aefa8274ad0443d2726197d84f44d1343e
+    cache_root: results/binary_tent/ss_calibration_cache_v2/NUDT-SIRST
+    cache_content_sha256: 3e9ed0cac6bc5e7257d0d5106c85352c783f302c4e949bd802ec1d5e707740d9
+    cache_manifest_sha256: bc9ac2caee9647365f58cf21fea30558295889adbb68b8c560779bcc73959e25
+    cache_method_manifest_sha256: 02b281fa8ed08906f6b4eab2525b86fc9c45c060d162e9c479cb61dac04f1b8d
+    cache_complete_sha256: 835c873f9d575b31e0947aecb9f8cfa2fc020832c0ab0317db7657e4ec484125
+    teacher_root: results/cr_sitta/nonadaptive_teacher_screen_v1/candidate_phase/NUDT-SIRST
+    teacher_manifest_sha256: a64f2a88fcd9e0c22640795c18a7c4ae360b767f0713714ec92bb41d566a6e0e
+    teacher_complete_sha256: f2c67f16050268f75cdce2f770a38109956b332a85d8e1ee962370492d78c63b
+
+ordered_conditions:
+  - [clean, 0]
+  - [gaussian_noise, 1]
+  - [gaussian_noise, 3]
+  - [gaussian_noise, 5]
+  - [gaussian_blur, 1]
+  - [gaussian_blur, 3]
+  - [gaussian_blur, 5]
+  - [low_contrast, 1]
+  - [low_contrast, 3]
+  - [low_contrast, 5]
+  - [stripe_noise, 1]
+  - [stripe_noise, 3]
+  - [stripe_noise, 5]
+
+teacher:
+  source: sealed_nonadaptive_teacher_base_view_probabilities
+  array_name: base_view_probabilities
+  accepted_view_names: [identity, hflip, vflip, hvflip]
+  accepted_view_indices: [0, 1, 2, 3]
+  aggregation: median
+  detached_required: true
+  probability_eps: 1.0e-6
+  variance_threshold: 0.01
+  target_threshold: 0.10
+  background_threshold: 0.01
+  uncertainty_temperature: 0.01
+  protection_radius: 3
+  candidate_threshold: 0.50
+  candidate_min_area: 1
+  ring_inner_radius: 3
+  ring_outer_radius: 7
+  local_contrast_radius: 3
+
+deterioration_bank:
+  input_space: physical_RGB_0_1_before_ImageNet_normalization
+  every_probe_runs_for_every_condition: true
+  benchmark_condition_name_available_to_probe: false
+  benchmark_severity_available_to_probe: false
+  probe_seed_namespace: cr-sitta-p3-stage-c0-signal-audit-v1
+  probe_seed_descriptor_protocol_field_name: protocol_id
+  probe_seed_namespace_role: preserve_v1_scientific_inputs_bit_exact
+  seed_derivation_fields:
+    - protocol_id
+    - global_seed
+    - canonical_image_id
+    - probe_id
+    - method_facing_input_tensor_sha256
+  probes:
+    - id: lf_mask
+      kind: low_frequency_amplitude_mask
+      mask_ratio: 0.20
+      keep_probability: 0.50
+    - id: hf_noise
+      kind: high_frequency_noise
+      target_rms: 0.02
+      low_cut_ratio: 0.20
+
+objective:
+  name: active_region_balanced_bootstrap_plus_local_contrast
+  entropy_margin: 0.01
+  min_active_pixels: 1
+  probability_eps: 1.0e-6
+  lambda_foreground: 1.0
+  lambda_background: 1.0
+  lambda_local_contrast: 0.10
+  lambda_router_l2: 0.0
+  lambda_router_spatial_tv: 0.0
+  candidate_weighting: equal_per_candidate_sum_to_one
+  empty_candidate_weight: empty_tensor
+  local_contrast_temperature: 0.25
+  local_contrast_ring_weight: 1.0
+  local_contrast_huber_delta: 1.0
+  foreground_background_separately_normalized: true
+
+parameter_spaces:
+  R-E1:
+    type: spatial_low_rank_film
+    insertion: fpn_x_e1
+    channels: 64
+    rank: 4
+    grid_size: [8, 8]
+    max_scale_delta: 0.05
+    max_bias: 0.05
+    expected_parameter_tensor_count: 2
+    expected_scalar_parameter_count: 512
+    normalized_virtual_step_l2_radius: 0.25
+  R-D0:
+    type: spatial_low_rank_film
+    insertion: decoder_x_d0
+    channels: 16
+    rank: 2
+    grid_size: [8, 8]
+    max_scale_delta: 0.05
+    max_bias: 0.05
+    expected_parameter_tensor_count: 2
+    expected_scalar_parameter_count: 256
+    normalized_virtual_step_l2_radius: 0.25
+  P2:
+    type: bn_affine
+    group_spec: decoder_low
+    expected_parameter_tensor_count: 16
+    expected_scalar_parameter_count: 416
+    normalized_virtual_step_radius_mode: relative_to_source_parameter_l2
+    normalized_virtual_step_relative_radius: 0.0005
+  ordered: [R-E1, R-D0, P2]
+  router_basis_seed: 3407
+
+outer_oracle_task_loss:
+  role: train_only_pilot64_outer_evaluator_gradient_alignment
+  used_by_adaptation: false
+  lambda_bce: 1.0
+  lambda_soft_iou: 1.0
+  eps: 1.0e-6
+  bce_reduction: mean_over_all_pixels
+  soft_iou_reduction: mean_over_sample
+  empty_target_convention: epsilon_smoothed_union_penalizes_foreground
+  normalized_virtual_step:
+    direction: negative_proxy_gradient
+    nonzero_epsilon: 1.0e-12
+    threshold_crossing_probability: 0.5
+    threshold_rule: strict_greater_than
+    threshold_crossing_role: report_only_not_stage_c0_hard_gate
+
+stage_c0_signal_gate:
+  eligibility_evaluated_before_followup_authorization: true
+  ranking_at_c0: forbidden
+  no_eligible_is_normal_scientific_result: true
+  nonclean_finite_nonzero_proxy_gradient_fraction_minimum: 0.80
+  nonclean_active_support_episode_fraction_minimum: 0.30
+  active_support_only_far_background_allowed: false
+  minimum_positive_dataset_macro_task_gradient_cosines: 2
+  dataset_count: 3
+  nonclean_macro_task_gradient_cosine_strictly_greater_than: 0.08
+  minimum_improving_directional_derivative_families: 3
+  corruption_family_count: 4
+  task_directional_derivative_improvement_rule: strictly_less_than_zero
+  identity_adapter_source_output: bit_exact
+  c0_failure_action: stop_without_stage_c1
+  c0_success_action: authorize_train_only_stage_c1_crossfit
+  formal_test_authorized: false
+
+implementation:
+  critical_code_paths:
+    - run_p3_stage_c0_signal_audit_v2.py
+    - analysis/stage_c0_teacher_student_gap.py
+    - analysis/stage_c0_active_support.py
+    - analysis/stage_c0_group_alignment.py
+    - analysis/d0_v2_task_loss.py
+    - analysis/source_train_provenance.py
+    - dataio/train_side_pilot_protocol.py
+    - materialize_binary_tent_ss_calibration_cache_v2.py
+    - model/MSHNet_NSFPN.py
+    - model/MSHNet_NSFPN_adaptable.py
+    - model/NS_FPN.py
+    - model/diff_cross_attns.py
+    - SFS_MSDeformAttn/ops/functions/ms_deform_attn_func.py
+    - SFS_MSDeformAttn/ops/modules/ms_deform_attn.py
+    - .conda/lib/python3.10/site-packages/MultiScaleDeformableAttention.cpython-310-x86_64-linux-gnu.so
+    - metrics/connected_components.py
+    - tta/model_adapter.py
+    - tta/adapters/nsfpn_router_adapter.py
+    - tta/adapters/spatial_low_rank_film.py
+    - tta/deteriorations/fourier_low_mask.py
+    - tta/deteriorations/high_frequency_noise.py
+    - tta/deteriorations/image_space.py
+    - tta/stage_c0_method_input.py
+    - tta/teachers/strong_view_teacher.py
+    - tta/proposals/source_multiview_teacher.py
+    - tta/views/irstd_views.py
+    - tta/objectives/active_bootstrap.py
+    - tta/objectives/_validation.py
+    - tta/objectives/asb_sfr.py
+    - tta/objectives/local_contrast_consistency.py
+    - tta/objectives/router_regularization.py
+    - tta/parameter_groups.py
+    - tta/d0_secure_io.py
+    - test_source.py
+    - analysis/stage_c_science_gate_v1.py
+    - configs/p3_stage_c_science_gate_v1.yaml
+
+output:
+  root: results/cr_sitta/p3_stage_c0_signal_audit_v2
+  candidate_phase: candidate_phase/R0
+  outer_phase: outer_phase/R0
+  aggregate_phase: aggregate_phase/R0
+  engineering_phase: engineering_smoke
+  atomic_no_replace: true
+  refuse_overwrite: true
+  existing_verified_complete_action: no_op

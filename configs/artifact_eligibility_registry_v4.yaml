@@ -1,0 +1,99 @@
+schema_version: 4
+registry_id: cr-sitta-artifact-eligibility-registry-v4
+status: frozen_append_only_declaration
+supersedes: cr-sitta-artifact-eligibility-registry-v3
+
+parent_registry:
+  registry_id: cr-sitta-artifact-eligibility-registry-v3
+  config_path: configs/artifact_eligibility_registry_v3.yaml
+  config_sha256: ef2dc3f8c0bb65b307c3751d2ad0aa298e3a61f95e19808e4a6a3544e42048fb
+  artifact_count: 15
+  append_only: true
+
+policies:
+  official_split_model: train_test_only
+  validation_split_created: false
+  main_paper_requires_no_test_selection: true
+  existing_artifacts_are_immutable: true
+  append_only_parent_required: true
+
+source_protocol:
+  design_document: CR-SITTA_StageB4负结果后的StageC方案与代码修改_v6.md
+  design_document_sha256: c8f360226bf123035d6fbb27096ce4f4e96f443cc81db92a35f994ac187b3e7a
+  stage_c0_protocol_id: cr-sitta-p3-stage-c0-signal-audit-v2
+  stage_c0_config_path: configs/p3_stage_c0_signal_audit_v2.yaml
+  stage_c0_config_sha256: be10f26359a218687f3d51ffd4aaeea56646c266e7d3862958682b2ccac54ce1
+  aggregate_recovery_protocol_id: cr-sitta-p3-stage-c0-aggregate-recovery-v1
+  aggregate_recovery_config_path: configs/p3_stage_c0_aggregate_recovery_v1.yaml
+  aggregate_recovery_config_sha256: 8ce80645997ec1ad76caded1e0cadde019cd2ecf7ef67b8f114028e530b91db8
+  aggregate_recovery_receipt_path: >-
+    results/cr_sitta/p3_stage_c0_aggregate_recovery_v1/RECOVERY_VERIFIED_RECEIPT.json
+  aggregate_recovery_receipt_sha256: 120a43c8c500d94f2d1a7303ed08db64bbb5e6b4001f8da59b9376d8048aa1ad
+
+artifacts:
+  - artifact_id: cr_sitta_stage_c0_r0_negative_archive_v1
+    root: results/cr_sitta/stage_c0_r0_negative_v1
+    artifact_role: stage_c0_r0_negative_signal_audit_nonpaper
+    identity:
+      mode: full_tree
+      algorithm: sorted-root-relative-path-tab-sha256-tab-size-lf-v1
+      expected_sha256: e3f167a0cd24b346561002c90a70646b76fb9e65e59e37cdeb8a3f112ba50d0d
+      file_count: 8
+      total_size_bytes: 22380
+    artifact_complete: true
+    formal_protocol_complete: false
+    source_stage_c0_protocol_complete: true
+    source_stage_c0_recovery_verified: true
+    scientific_eligibility:
+      tier: development_test_selected
+      main_paper_table: false
+      reason_codes:
+        - source_checkpoint_test_selected
+        - stage_c0_scientific_no_eligible
+        - no_parameter_space_eligible
+        - stage_c1_not_allowed
+        - r1_r2_not_allowed
+        - formal_test_not_allowed
+        - full_cr_sitta_not_evaluated
+        - negative_result_for_method_redesign_only
+        - archive_formal_completion_seal_absent
+        - postverify_python_container_type_erratum_canonical_semantics_equal
+    selection:
+      source_checkpoint_role: best_miou
+      checkpoint_selection_split: test
+      tta_calibration_split: train
+      test_used_for_checkpoint_selection: true
+      test_used_for_tta_selection: false
+    data_boundary:
+      no_validation_split: true
+      candidate_split: train
+      candidate_role: fixed_Pilot64
+      outer_target_split: train
+      outer_target_role: fixed_Pilot64_outer_evaluator_only
+      method_label_access_count: 0
+      adaptation_gradient_uses_labels: false
+      validation_image_access_count: 0
+      validation_mask_access_count: 0
+      test_image_access_count: 0
+      test_mask_access_count: 0
+    source_decision:
+      protocol_status: protocol_complete_under_independent_recovery
+      original_v2_runner_self_verification_passed: false
+      recovery_verified: true
+      scientific_status: scientific_no_eligible
+      eligible_space_ids: []
+      stage_c1_allowed: false
+      stage_c_r1_r2_allowed: false
+      formal_test_allowed: false
+      full_cr_sitta_evaluated: false
+    notes: >-
+      Eight-file append-only archive of the train-only Stage C0 R0 signal
+      audit. The source aggregate evidence and science decision were rebuilt
+      exactly by a separately frozen recovery after the v2 verifier exposed a
+      tuple-versus-JSON-list comparison erratum. The canonical authorization
+      semantics, data, coverage, thresholds, and statistics did not change.
+      The derived archive has no independent manifest/completion seal and is
+      therefore registered by exact full-tree identity with
+      formal_protocol_complete=false. It is excluded from every main-paper
+      result table. C1, R1/R2, and formal test remain blocked, and the negative
+      result applies only to the evaluated ASB-SFR C0 mechanism.

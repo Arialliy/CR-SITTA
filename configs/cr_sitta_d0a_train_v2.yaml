@@ -1,0 +1,155 @@
+schema_version: 1
+protocol_id: cr-sitta-d0a-supervised-lfhf-train-1000e-v2
+created_at: "2026-09-04"
+
+revision_lineage:
+  predecessor: configs/cr_sitta_d0a_train_v1.yaml
+  predecessor_sha256: 010499c4becb0b668790d3827ffd8f5830cf02e475ee6e7bbd8c20ec73a8e37d
+  predecessor_result: aborted_engineering_negative
+  predecessor_receipt: >-
+    results/cr_sitta/engineering_smoke/d0a_supervised_lfhf_train_v1/ABORTED_ENGINEERING_RECEIPT.json
+  repaired_scope: degraded_branch_batchnorm_policy_only
+  science_hypothesis_changed: false
+  probe_parameters_changed: false
+  loss_weights_changed: false
+
+scope:
+  stage: D0-A
+  role: train_only_supervised_degraded_view_compatibility
+  development_only: true
+  paper_result: false
+  no_validation_split: true
+  use_validation_payload: false
+  use_test_payload: false
+  validation_payload_opens_required: 0
+  test_payload_opens_required: 0
+  result_root: results/cr_sitta/d0a_supervised_lfhf_train_v2
+  scientific_claim: >-
+    This stage trains on supervised LF/HF degraded source views. It does not by
+    itself establish proxy/task gradient alignment; that claim requires the
+    subsequent frozen Pilot64 Stage-C0 gradient gate.
+
+training:
+  derived_from: configs/retrain_fixed_splits.yaml
+  architecture: MSHNet_NSFPN
+  initialization: random
+  epochs: 1000
+  batch_size: 16
+  optimizer: Adagrad
+  learning_rate: 0.05
+  warm_epochs: 5
+  base_size: 256
+  crop_size: 224
+  seed: 42
+  num_workers: 8
+  expected_state_dict_keys: 505
+  degraded_branch_batchnorm: train_batch_stats_no_running_update
+  official_train_only: true
+  test_evaluation_during_training: false
+  validation_evaluation_during_training: false
+  checkpoint_selection:
+    rule: fixed_final_epoch
+    epoch: 1000
+    output_name: epoch_1000_train_only.pth.tar
+    best_miou: forbidden_without_train_internal_oof_rule
+    best_pd: forbidden_without_train_internal_oof_rule
+
+objective:
+  name: clean_plus_supervised_degraded_view_segmentation
+  clean_segmentation_loss_weight: 1.0
+  degraded_segmentation_loss_weight: 1.0
+  lambda_degraded: 1.0
+  normalization: divide_by_one_plus_lambda_degraded
+  degraded_view_uses_source_train_target: true
+  pseudo_labels: false
+  entropy_minimization: false
+  test_time_objective_enabled: false
+
+deterioration_views:
+  input_space: physical_RGB_0_1_before_ImageNet_normalization
+  schedule: deterministic_alternating_per_optimizer_step
+  ordered_probe_ids: [lf_mask, hf_noise]
+  benchmark_condition_name_available_to_probe: false
+  benchmark_severity_available_to_probe: false
+  seed_derivation_fields:
+    - protocol_id
+    - global_seed
+    - dataset_id
+    - epoch
+    - canonical_image_id
+    - probe_id
+  probes:
+    lf_mask:
+      kind: low_frequency_amplitude_mask
+      mask_ratio: 0.20
+      keep_probability: 0.50
+    hf_noise:
+      kind: high_frequency_noise
+      target_rms: 0.02
+      low_cut_ratio: 0.20
+
+smoke_gate:
+  required_before_full_1000e: true
+  data_role: train_only
+  separate_result_root: results/cr_sitta/engineering_smoke/d0a_supervised_lfhf_train_v2
+  requirements:
+    deterministic_repeat: exact
+    target_unchanged: true
+    finite_losses_and_gradients: true
+    both_clean_and_degraded_losses_have_gradient: true
+    alternating_probe_count_conserved: true
+    degraded_branch_uses_batch_statistics: true
+    degraded_branch_persistent_bn_updates: 0
+    validation_payload_opens: 0
+    test_payload_opens: 0
+  on_failure: stop_before_full_training
+
+post_training_gate:
+  checkpoint_input: epoch_1000_train_only.pth.tar
+  next_stage: frozen_Pilot64_original_Stage-C0_gradient_gate
+  stage_c0_required_before_tta: true
+  stage_c0_required_before_formal_test: true
+  on_no_eligible_parameter_space: stop_no_tta_no_formal_test
+
+checkpoint_disclosure:
+  current_protocol_checkpoint_test_selected: false
+  current_protocol_checkpoint_selection_source: fixed_epoch_1000_train_only
+  upstream_baseline_best_miou_test_selected: true
+  upstream_baseline_best_pd_test_selected: true
+  upstream_development_only: true
+  statement: >-
+    Earlier baseline best_miou and best_pd checkpoints are repeated-test-selected
+    development comparators. D0-A emits only the preregistered epoch-1000
+    train-only checkpoint; final dual axes require train-internal OOF selection.
+
+datasets:
+  IRSTD-1K:
+    root: datasets/IRSTD-1K
+    train_split: datasets/IRSTD-1K/img_idx/train_IRSTD-1K.txt
+    train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+    train_images: 800
+    train_corpus_manifest_sha256: fe1c8b31c2dfae729c0f89b38642c4f51ef5860adfba4eb85549477903e61785
+    known_train_size_mismatches: []
+    test_split_metadata_only: datasets/IRSTD-1K/img_idx/test_IRSTD-1K.txt
+    test_split_sha256_metadata_only: 8c71e474358acb84f2cbebfd1282ffea236f9cb852b7f7c04feb2fd99804c579
+    test_images_metadata_only: 201
+  NUAA-SIRST:
+    root: datasets/NUAA-SIRST
+    train_split: datasets/NUAA-SIRST/img_idx/train_NUAA-SIRST.txt
+    train_split_sha256: 324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4
+    train_images: 213
+    train_corpus_manifest_sha256: 8fe7257cc2f4136b01fea8fec38f360da7ddcd3604ef702e7fd3e202287fd900
+    known_train_size_mismatches: []
+    test_split_metadata_only: datasets/NUAA-SIRST/img_idx/test_NUAA-SIRST.txt
+    test_split_sha256_metadata_only: e49023203a323c247306b314f23c8b3b917093a26984067792355adff7a8386e
+    test_images_metadata_only: 214
+  NUDT-SIRST:
+    root: datasets/NUDT-SIRST
+    train_split: datasets/NUDT-SIRST/img_idx/train_NUDT-SIRST.txt
+    train_split_sha256: e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3
+    train_images: 663
+    train_corpus_manifest_sha256: fc2983e04bc1c8f9bba03d67398c7abeefa2217ef2ced1bec0df4c0f15901221
+    known_train_size_mismatches: []
+    test_split_metadata_only: datasets/NUDT-SIRST/img_idx/test_NUDT-SIRST.txt
+    test_split_sha256_metadata_only: a463c52ee64b1c803c4a322fe090aaf6bc360844898e3943bb7c64a8e551b86e
+    test_images_metadata_only: 664

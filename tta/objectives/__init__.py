@@ -1,6 +1,12 @@
 """Label-free, fail-closed objective primitives for CR-SITTA Stage-B."""
 
 from ._validation import StageBObjectiveError
+from .active_bootstrap import (
+    ActiveBootstrapOutput,
+    active_bootstrap_binary,
+    bernoulli_probability_entropy,
+)
+from .asb_sfr import ASBSFRObjectiveOutput, asb_sfr_proposal_objective
 from .balanced_entropy import (
     BalancedEntropyOutput,
     balanced_binary_entropy,
@@ -22,6 +28,10 @@ from .foreground_mass_guard import (
     foreground_mass_guard_components,
     foreground_mass_guard_from_logits,
 )
+from .local_contrast_consistency import (
+    LocalContrastConsistencyOutput,
+    candidate_local_contrast_consistency,
+)
 from .parameter_anchor import (
     ParameterCollection,
     parameter_anchor,
@@ -42,6 +52,12 @@ from .region_balanced_consistency import (
     reliable_background_soft_bce,
     source_anchored_multiview_consistency,
 )
+from .router_regularization import (
+    RouterRegularizationOutput,
+    router_coefficient_l2,
+    router_coefficient_total_variation,
+    router_regularization,
+)
 from .soft_iou_anchor import (
     ForegroundOverlap,
     foreground_soft_dice_anchor,
@@ -52,23 +68,31 @@ from .soft_iou_anchor import (
 
 
 __all__ = [
+    "ActiveBootstrapOutput",
+    "ASBSFRObjectiveOutput",
     "BalancedEntropyOutput",
     "ConsistencyDivergence",
     "FeatureStatisticsAlignmentOutput",
     "ForegroundMassGuardOutput",
     "ForegroundOverlap",
+    "LocalContrastConsistencyOutput",
     "MultiViewConsistencyOutput",
     "ParameterCollection",
     "RegionConsistencyOutput",
     "RegionLossOutput",
+    "RouterRegularizationOutput",
     "SourceAnchoredRegionWeights",
     "SourceFeatureStatistics",
     "StageBObjectiveError",
+    "active_bootstrap_binary",
+    "asb_sfr_proposal_objective",
     "balanced_binary_entropy",
     "balanced_entropy",
     "bernoulli_entropy_map",
+    "bernoulli_probability_entropy",
     "bernoulli_jensen_shannon_map",
     "build_source_anchored_region_weights",
+    "candidate_local_contrast_consistency",
     "feature_statistics_alignment",
     "feature_statistics_alignment_components",
     "feature_statistics_alignment_loss",
@@ -86,6 +110,9 @@ __all__ = [
     "region_balanced_loss",
     "region_balanced_multiview_consistency",
     "reliable_background_soft_bce",
+    "router_coefficient_l2",
+    "router_coefficient_total_variation",
+    "router_regularization",
     "soft_dice_anchor",
     "soft_iou_anchor",
     "source_anchored_multiview_consistency",

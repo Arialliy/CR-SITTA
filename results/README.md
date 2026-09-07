@@ -34,7 +34,10 @@ TTA Pilot 仅用于方法超参数校准；它不是新的数据划分、不是�
 `development_test_selected`，不能表述为未触碰 test 的无偏论文主表结果。
 基础资格规则见 `configs/artifact_eligibility_registry_v1.yaml`；已完成的
 best-pd development axis 由 append-only 的
-`configs/artifact_eligibility_registry_v2.yaml` 登记。运行
+`configs/artifact_eligibility_registry_v2.yaml` 登记；Stage B4 R0 负结果由 v3
+登记，Stage C0 R0 负结果再由
+`configs/artifact_eligibility_registry_v4.yaml` 以 v3 为不可变父节点追加登记，
+不改写 v1/v2/v3。运行
 `./.conda/bin/python scripts/validate_result_eligibility_v2.py materialize` 后会在
 本目录生成被 Git 忽略的 `artifact_eligibility_registry_v2.json`，且会先严格验证
 v1 父 registry，不改写任何已经封存的实验产物。
@@ -138,10 +141,133 @@ Pilot16 上筛选 10 个候选，`O3_P2`、`O4_P2`、`O3_DecoderFiLM` 和
 候选还未满足 dataset/family 覆盖与 threshold-crossing episode fraction 门。
 因此 selected-for-R1/R2 为空，B5、正式 test 和后续风险控制器均未授权。
 
+上述终止结论已按 C-0 追加封存在
+`cr_sitta/stage_b4_r0_negative_v1/`。该六文件目录用原 aggregate、candidate 和
+outer 的 manifest/COMPLETE 哈希绑定 9,984 条 candidate episode、9,984 条 outer
+episode、0/4 合格候选及 O4 guard 在 4,992 条 O4 episode 中零激活的事实。Stage B4
+只使用 train Pilot64：方法侧标签访问为 0，train mask 仅由后置 outer evaluator
+读取，validation/test 图像与 mask payload 访问均为 0；没有创建 validation split。
+这不消除上游 `best_miou` checkpoint 由固定 test 反复评价选出的事实，因此该档案
+仍是 `development_test_selected`、`paper_result: false`。负结论只适用于本次 Stage
+B4 proposal family；完整 CR-SITTA 未被评价，R1/R2、B5 和正式 test 均保持禁止。
+
+Stage C 的 ASB-SFR 无优化信号审计已在固定 train Pilot64 上完成，源产物位于
+`cr_sitta/p3_stage_c0_signal_audit_v2/`，终止结论追加封存在
+`cr_sitta/stage_c0_r0_negative_v1/`。3,022/4,608 个 non-clean probe episode
+产生 active support，其中 2,453/3,022 具有候选邻近 support；这两个共享门通过。
+但 R-E1、R-D0、P2 的 finite nonzero proxy gradient 覆盖率均仅为 65.58%，低于
+冻结的 80% 门；宏观 outer-gradient cosine 分别为 0.04964、0.04595、0.02525，
+也均未严格超过 0.08。虽然每个空间都满足 2/3 正 cosine 数据集、3/4 改善退化族
+和 Source identity bit-exact，仍然没有任何合格空间，故 Stage C1、R1/R2 和正式
+test 均未授权。
+
+v2 aggregate 在完整结果落盘后的自验证因 Python `tuple()` 与 JSON `[]` 的容器
+比较退出 2；该原始 aggregate 不表述为“v2 自验证通过”。独立冻结的
+`cr_sitta/p3_stage_c0_aggregate_recovery_v1/RECOVERY_VERIFIED_RECEIPT.json`
+先复现唯一终端错误，再只对 `StageCAuthorization.parameter_space_ids` 做内存
+tuple→list 规范化，完整验证器随后通过；aggregate evidence、science decision
+和 authorization 又被独立重算且完全一致。该勘误没有改变数据、覆盖、阈值、
+统计或科学结论，且没有读取 image/target/validation/test payload。C0 负结果只
+适用于 ASB-SFR signal gate，不表示完整 CR-SITTA 已失败或已被评价。
+
+Stage C0 未过门后，训练兼容化分支 D0-A 已建立独立入口
+`train_cr_sitta_d0a.py`。v1 train-only smoke 在 NUDT-SIRST 的第 2 个 HF
+step 因未校准 BN running statistics 产生非有限 degraded loss，已原样登记在
+`cr_sitta/engineering_smoke/d0a_supervised_lfhf_train_v1/`，没有启动 1000e。
+v2 仅将 degraded 分支改为使用 batch statistics 且不持久更新 BN buffers；三个
+数据集的两步真实 GPU smoke 均通过，证据汇总在
+`cr_sitta/engineering_smoke/d0a_supervised_lfhf_train_v2/SMOKE_GATE.json`：
+每个数据集 LF/HF 各一步、loss/gradient 有限、505-key 双模型 strict load 通过、
+BN `num_batches_tracked` 均只增加 2，系统 `openat` 审计的 test/validation 命中为
+0。全仓库 1782 项测试退出码为 0。
+
+v2 full run 写入 `cr_sitta/d0a_supervised_lfhf_train_v2/<dataset>/`，只保存
+逐 epoch `last.pth.tar` 和固定终点 `epoch_1000_train_only.pth.tar`；训练期间不
+构造 test/validation loader，也不产生 `best_miou`/`best_pd`。这三个权重完成后
+必须先回到冻结 train Pilot64 重跑 Stage-C0 梯度门。这里的 D0-A 只是
+proxy-compatible training 假设，不能提前表述为 CR-SITTA/TTA 已成功。
+
+不反序列化 checkpoint 的当前进度查询：
+
+```bash
+./.conda/bin/python scripts/report_cr_sitta_d0a_status.py
+./.conda/bin/python scripts/report_cr_sitta_d0a_status.py --json
+```
+
+`last.pth.tar` 是含 optimizer 与进程 RNG 的训练恢复产物，不是 D0-B
+直接读取的推理权重。每个 1000 epoch 运行完成后，必须用
+`export_cr_sitta_d0a_safe_checkpoint.py` 校验 source checkpoint、
+`run_contract.json` 和 `FULL_TRAIN_FREEZE.json` 的独立 SHA-256，再生成
+no-replace 的 `epoch_1000_train_only_safe.pth.tar` 与最后发布的
+`SAFE_EXPORT.json` 哨兵。不得对正在写入的 `last.pth.tar` 执行导出。
+
+若 v2 worker 在 1000 epoch 前中断，原始 CUDA `--resume` 路径会把 CPU
+RNG tensor 映射到 GPU，因此不可直接使用。只能在确认 worker
+已停止后运行 `recover_cr_sitta_d0a_v2.py`；CLI 必须传入独立记录的
+source/run-contract/full-freeze SHA-256，并显式确认进程已停止和本地
+pickle 可信，具体参数以 `--help` 为准。工具会校验连续 JSONL
+前缀、checkpoint epoch/step、训练 split 和全部冻结哈希，并只发布
+绑定 receipt 的 RNG-sanitized epoch-boundary 恢复权重。该路径不声称
+跨 CUDA 进程 bit-exact。
+
+D0-B 已以独立入口 `run_cr_sitta_d0b_gradient_gate_v1.py` 实现。当前只允许
+运行不写产物的 `preflight`；在三份 `SAFE_EXPORT.json` 全部存在并
+校验通过之前，它必须返回 `ready=false`。准备完成后的顺序固定为
+`freeze -> teacher -> candidate -> outer -> aggregate`；teacher、candidate、
+proxy/outer gradient 和 aggregate 都从 D0-A 新 checkpoint 重建，不读取旧
+C0 数值产物。D0-B 最多只能授权 D1 train-internal OOF，不能直接授权
+formal test。
+
+D0-A 到 D0-B 的正式交接由
+`scripts/orchestrate_cr_sitta_d0a_to_d0b_v1.py` 管理。默认 `status` 和显式
+`dry-run` 均为零写入；只有 `execute` 会等待三组 1000 epoch 全部完成，逐组
+深验 train-only 日志、final/last checkpoint 与访问计数，再生成安全权重并按
+“三个 teacher 全部完成 -> 三个 candidate 全部完成 -> 三个 outer 全部完成”
+的全局屏障运行 D0-B。编排产物统一保存在
+`cr_sitta/d0a_to_d0b_orchestrator_v1/`，D0-B 产物保存在
+`cr_sitta/d0b_checkpoint_rebound_gradient_gate_v1/`。终点固定为 D0-B
+`verify` 和 `PIPELINE_COMPLETE.json`；无论正负结果都不自动启动 D1，也不访问
+formal test。
+
+2026-09-07 的续跑与单数据集评测单独登记在
+`cr_sitta/d0a_continuation_20260907/EXECUTION_PLAN.json`。NUDT-SIRST 已完成
+1000 epoch 并导出 `epoch_1000_train_only_safe.pth.tar`；应用户在讨论已完成
+权重的性能后提出的继续要求，先运行其 clean fixed-test **开发评测**，结果进入
+`cr_sitta/d0a_development_test_v1/NUDT-SIRST/`，保存全部 664 个预测 mask 和
+概率图，并同时比较 baseline 的 `best_miou`、`best_pd`。这是对原先
+“三组训练与 D0-B 完成后再评价”顺序的显式调整，不能作为 D0-B/D1 的晋级
+依据，也不记作正式 test 或完整 CR-SITTA TTA 的结果。训练期和安全导出期的
+zero-test-access 记录仅描述其各自阶段，不能用于声称本次开发评测没有读取 test。
+
+该评测现已完成，`COMPLETE.json` 与全量产物核验通过：664 张预测 mask、
+664 张 float32 概率图及 664 条逐图记录均齐全。按与 baseline 相同的
+legacy 官方口径，D0-A epoch1000 的 mIoU / PD / Fa(×10⁻⁶) 为
+79.124396% / 97.248677% / 25.461955；相对 `best_miou`，mIoU 下降
+1.091306 个百分点、PD 下降 0.423280 个百分点、Fa 增加 6.549330，
+没有刷新 clean 性能。相对 `best_pd` 仅 mIoU 增加 0.057874 个百分点，
+PD 和 Fa 均退步。双轴表见
+`cr_sitta/d0a_development_test_v1/NUDT-SIRST/comparison.md`，独立产物核验见
+`cr_sitta/d0a_continuation_20260907/NUDT_EVALUATION_QA.json`。
+另存的 unified Fa 为 25.393015，因目标匹配算法不同，不能与本表 legacy Fa
+混用；本次没有更改任一评价器或冻结协议。
+
+IRSTD-1K 在核验 epoch-565 断点后，通过独立的 `recovery/RECOVERY.json`
+恢复到原目录继续训练；NUAA-SIRST 按冻结协议从头训练。两项任务由用户
+systemd 服务持久运行，日志分别为
+`cr_sitta/d0a_continuation_20260907/irstd_training.log` 和
+`cr_sitta/d0a_continuation_20260907/nuaa_training.log`。旧编排进程已经退出；
+其原先关于安全导出顺序的收据不再描述此次单数据集提前评测，因此本次不直接
+重新启动该版本。后续 D0-B 仍需使用冻结配置完成原定检查。
+
 上述 Stage-B artifact 全部固定为 source-train-derived、development-only 和
 `paper_result: false`。其冻结配置还绑定本机保留的 v5 决策溯源 memo 以及被 Git
 忽略的 B1/B2/B3 前序 receipts；公开仓库包含计算配置、runner、门函数和单元测试，
 但不包含可在 fresh clone 中独立复验的完整历史 artifact 包。
+
+Stage-C/D0 冻结配置同样绑定本机保留的 v6/v7 决策溯源 memo、编译环境文件和被
+Git 忽略的结果 receipts。公开仓库不发布这些私有输入或生成产物；fresh clone
+默认运行可移植单元测试，只有在恢复完整本地产物后才应设置
+`NS_FPN_RUN_LOCAL_ARTIFACT_TESTS=1` 执行精确历史集成复验。
 
 若 worker 在 receipt 构造前因工程异常退出，不会伪造单进程 receipt；这类事件
 单独登记在 `cr_sitta/tent_failure_diagnostics_v1/incidents/`，固定为非论文、

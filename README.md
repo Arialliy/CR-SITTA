@@ -10,12 +10,16 @@ test-time adaptation. Every episode starts from the same Source checkpoint and
 restores the complete Source state before the next image.
 
 > **Development status:** this is not yet a release of the full CR-SITTA
-> method. Stage-B now includes a task-aligned proposal screen and label-free
-> per-attempt backtracking, but the candidate-response Jacobian/QP risk
-> controller, final candidate selection, R1/R2 confirmation, formal test
-> evaluation, and second-backbone study remain future work. The current AdaBN,
-> Binary TENT, teacher, and Stage-B implementations are development evidence
-> and infrastructure, not the final CR-SITTA algorithm.
+> method. Stage B4 R0 rejected all 4 candidates, and the subsequent train-only
+> ASB-SFR Stage C0 signal audit rejected all three grouped parameter spaces.
+> The scoped decisions are summarized in [results/README.md](results/README.md)
+> and preserved locally in append-only Stage B4 and Stage C0 archives. Generated
+> result trees are intentionally Git-ignored and are not part of this source
+> release.
+> Consequently Stage C1, R1/R2, Stage B5, candidate-level risk control, and
+> formal test evaluation remain blocked. AdaBN, Binary TENT, teacher, Stage-B,
+> and Stage-C0 are development evidence and infrastructure, not the final
+> CR-SITTA algorithm.
 
 > **Protocol status:** the local benchmark uses only the existing `train` and
 > `test` ID files under `datasets/`; no validation split is created. The current
@@ -24,12 +28,23 @@ restores the complete Source state before the next image.
 > than an untouched-test main-paper benchmark. Under the frozen protocol, TTA
 > parameters must be calibrated once on a fixed train-side Pilot with
 > `best_miou` and then reused unchanged for `best_pd`. See
-> [results/README.md](results/README.md) and the append-only eligibility rules
-> in [configs/artifact_eligibility_registry_v2.yaml](configs/artifact_eligibility_registry_v2.yaml),
-> whose immutable parent is
-> [configs/artifact_eligibility_registry_v1.yaml](configs/artifact_eligibility_registry_v1.yaml).
+> [results/README.md](results/README.md) and the append-only Stage C0 declaration
+> in [configs/artifact_eligibility_registry_v4.yaml](configs/artifact_eligibility_registry_v4.yaml),
+> whose immutable parent chain is
+> [v3](configs/artifact_eligibility_registry_v3.yaml) →
+> [v2](configs/artifact_eligibility_registry_v2.yaml) →
+> [v1](configs/artifact_eligibility_registry_v1.yaml).
 > Run `./.conda/bin/python scripts/validate_result_eligibility_v2.py materialize`
-> to materialize the ignored local v2 registry.
+> to materialize and verify the ignored local v2 parent registry; v3 and v4
+> append exact full-tree negative-result declarations without rewriting their
+> parents.
+>
+> Exact historical verification of the Stage-C/D0 frozen contracts additionally
+> requires Git-ignored receipts, compiled environment files, and SHA-256-bound
+> local v6/v7 decision-provenance memos. A fresh clone contains the source,
+> configs, gates, and portable unit tests; opt in to local-artifact integration
+> tests with `NS_FPN_RUN_LOCAL_ARTIFACT_TESTS=1` only after restoring those
+> private inputs.
 
 ## Current scope
 
@@ -40,8 +55,9 @@ restores the complete Source state before the next image.
 | Single-image episodic state/reset framework and AdaBN | Implemented, including the formal 3-dataset × 13-condition runner |
 | Binary Episodic TENT | Stage 1 engineering protocol and the source-train-only D0-v3 formal Stage-A diagnosis are complete. All 10 candidates failed the frozen utility gate (0/10 eligible), so R1/R2 and Stage 2/3 are hard-blocked and the all-BN entropy-update route is retained only as negative evidence |
 | Non-adaptive multi-view teacher (P4) | The local source-train Pilot64 screen is complete across 3 datasets × 13 conditions. All 10 candidates failed the frozen utility gate (0/10 eligible); the best candidate reached non-clean macro ΔIoU +0.000722, below the required >+0.001. P5 remains unauthorized |
-| Task-aligned Stage-B proposal generator | B1 mechanism decomposition completed on 2,496 train-side episodes; the B3 Pilot16 screen promoted 4/10 candidates. The full Pilot64 B4 gate then rejected all 4 candidates (0/4 eligible): the best P2 proposals reached non-clean macro ΔIoU +0.000357 but failed the frozen positive-family coverage requirement. R1/R2 and B5 remain blocked |
-| Full CR-SITTA | Not implemented yet |
+| Task-aligned Stage-B proposal generator | B1 mechanism decomposition completed on 2,496 train-side episodes; the B3 Pilot16 screen promoted 4/10 candidates. The full Pilot64 B4 gate then rejected all 4 candidates (0/4 eligible): the best P2 proposals reached non-clean macro ΔIoU +0.000357 but failed the frozen positive-family coverage requirement. The local C-0 negative archive preserves this scoped result; R1/R2, B5, and formal test remain blocked |
+| Stage-C ASB-SFR signal audit | C0 completed on the fixed train Pilot64. Active support was 65.58% and candidate-proximal coverage among active episodes was 81.17%, but all spaces failed the frozen 80% finite/nonzero-gradient and >0.08 macro-cosine gates. The local Stage C0 negative archive records the independently recovered decision; C1 and formal test remain blocked |
+| Full CR-SITTA | Not implemented or evaluated yet |
 
 The untouched historical v2 runner is preserved only as a non-authorizing
 [negative-result code supplement](scripts/archive_binary_tent_ss_v2_runner_source.py),
@@ -170,6 +186,81 @@ These are full formal runs rather than quick smoke tests. Inspect an entry
 point with `--help` before launching it. Binary TENT is intentionally excluded
 from the quick-start path because v2 failed the scientific gate and its
 Stage 2/3 entrypoints are permanently blocked.
+
+## CR-SITTA D0-A train-only compatibility stage
+
+Stage C0 did not pass its frozen proxy/task-gradient gate, so C1 remains
+blocked. The next registered hypothesis is D0-A supervised LF/HF degraded-view
+training. It preserves the original 505-key NS-FPN checkpoint schema, but it is
+not itself evidence of successful TTA or proxy alignment.
+
+```bash
+# Engineering gate: one LF and one HF train step; no test loader is built.
+./.conda/bin/python train_cr_sitta_d0a.py \
+  --protocol configs/cr_sitta_d0a_train_v2.yaml \
+  --dataset IRSTD-1K --device cuda:0 --train-only-smoke
+
+# Fixed 1000-epoch train-only endpoint; repeat for the other two datasets.
+./.conda/bin/python train_cr_sitta_d0a.py \
+  --protocol configs/cr_sitta_d0a_train_v2.yaml \
+  --dataset IRSTD-1K --device cuda:0
+```
+
+The full run never opens the test split and emits
+`epoch_1000_train_only.pth.tar`; it does not create a test-selected `best`
+checkpoint. The next required step is to rerun the frozen train Pilot64
+Stage-C0 gradient gate with the new checkpoint. Only a passing gate may unlock
+episodic TTA or formal test. The frozen v2 training and D0-B configs retain the
+complete boundary and dual-axis (`final_miou_axis` / `final_pd_axis`) policy;
+their historical provenance is SHA-256-bound to the local v7 memo described
+above.
+
+The v2 training artifact also contains optimizer and process-RNG state, so it
+is not the inference hand-off. After a complete epoch-1000 run, use
+`export_cr_sitta_d0a_safe_checkpoint.py` with the independently recorded source,
+run-contract, and full-freeze SHA-256 values. The exporter writes a no-replace
+`epoch_1000_train_only_safe.pth.tar`; `SAFE_EXPORT.json` is its completion
+sentinel. Do not export a live `last.pth.tar`.
+
+If a worker is interrupted before epoch 1000, do not pass its CUDA-loaded
+`last.pth.tar` directly to `--resume`. First use
+`recover_cr_sitta_d0a_v2.py` after confirming that the worker is no longer
+running. The CLI requires independently recorded SHA-256 anchors for the source,
+run contract, and full freeze, plus explicit process-stopped and trusted-local
+acknowledgements; inspect `--help` before use. Resume only from the resulting
+receipt-bound, RNG-sanitized checkpoint. This recovery route preserves the epoch
+boundary but does not claim bit-exact equivalence across CUDA processes.
+
+The checkpoint-rebound D0-B implementation is prepared in
+`run_cr_sitta_d0b_gradient_gate_v1.py`. Its read-only readiness check is:
+
+```bash
+./.conda/bin/python run_cr_sitta_d0b_gradient_gate_v1.py preflight
+```
+
+It must remain `ready=false` until all three `SAFE_EXPORT.json` receipts exist
+and verify. Only then may `freeze`, per-dataset `teacher`/`candidate`/`outer`,
+and `aggregate` run in that order. D0-B rebuilds every checkpoint-dependent
+artifact and can authorize only D1 train-internal OOF; it cannot authorize a
+formal test directly.
+
+The reviewed hand-off is automated by
+`scripts/orchestrate_cr_sitta_d0a_to_d0b_v1.py`. Its default `status` and
+explicit `dry-run` modes are read-only. Only `execute` may wait for all three
+1000-epoch D0-A runs, deep-validate their train-only completion, publish
+hash-bound safe exports, and run D0-B with the global barrier
+`all teacher -> all candidate -> all outer` on physical GPU 2:
+
+```bash
+./.conda/bin/python scripts/orchestrate_cr_sitta_d0a_to_d0b_v1.py status
+./.conda/bin/python scripts/orchestrate_cr_sitta_d0a_to_d0b_v1.py dry-run
+./.conda/bin/python scripts/orchestrate_cr_sitta_d0a_to_d0b_v1.py execute
+```
+
+The orchestrator terminates after D0-B `verify` and publishes
+`PIPELINE_COMPLETE.json`. A negative D0-B gate is a valid scientific stop; a
+positive gate authorizes, but does not launch, D1. Neither branch accesses the
+formal test split.
 
 ## Upstream and third-party attribution
 

@@ -1,0 +1,175 @@
+schema_version: 1
+protocol_id: cr-sitta-p3-stage-c0-train-only-signal-gate-v1
+created_at: "2026-09-04"
+
+# Frozen before any Stage-C0 model execution.  These thresholds may only be
+# changed to repair a demonstrated numeric/parser bug; outer performance is
+# not a permitted reason to move them.
+freeze:
+  thresholds_frozen_before_run: true
+  freeze_status: preregistered_not_result_tuned
+  source_document: CR-SITTA_StageB4负结果后的StageC方案与代码修改_v6.md
+  source_sections: ["7.2", "8", "9.7", "10"]
+
+scope:
+  stage: C0_signal_audit
+  purpose: prove_train_side_proxy_signal_before_any_C1_optimization_screen
+  data_role: train
+  split_role: fixed_Pilot64
+  pilot_image_count_per_dataset: 64
+  development_only: true
+  paper_result: false
+  final_test_result: false
+  no_validation_split: true
+  use_validation_payload: false
+  use_test_payload: false
+  expected_validation_access_count: 0
+  expected_test_access_count: 0
+  adaptation_gradient_uses_labels: false
+  train_outer_labels_used_for_signal_audit_only: true
+  c0_may_authorize: train_only_C1
+  c0_may_not_authorize: [R1, R2, formal_test, publication_claim]
+
+fixed_pilot64:
+  selection_protocol: configs/tta_train_side_calibration_pilot_v2.yaml
+  datasets:
+    IRSTD-1K:
+      train_split: datasets/IRSTD-1K/img_idx/train_IRSTD-1K.txt
+      train_split_sha256: 689a5f30a394ad47315ebe0f6df2d7f12429aa314ffb2cdf86f7fbd7be4ee744
+      pilot_ids: configs/tta_train_side_pilot_v2/IRSTD-1K.txt
+      ordered_pilot64_ids_sha256: 0ee4400c021dcfb639d813bc20582060a3fff8bb635292e48abf820ce90abb13
+    NUAA-SIRST:
+      train_split: datasets/NUAA-SIRST/img_idx/train_NUAA-SIRST.txt
+      train_split_sha256: 324e5dadcb6cc9fc2a99a5f5dedd06ad4de77b2ed826e4ceffda8b6a784da0b4
+      pilot_ids: configs/tta_train_side_pilot_v2/NUAA-SIRST.txt
+      ordered_pilot64_ids_sha256: a48e5e3f0ec3e6911a74f953e96aa7ea362b2f2f32c37626099afd61f4935baa
+    NUDT-SIRST:
+      train_split: datasets/NUDT-SIRST/img_idx/train_NUDT-SIRST.txt
+      train_split_sha256: e0a79f7c3d42548ba7d7dad9d2d336012b63a6bc5081e89e286f0f45036f8ec3
+      pilot_ids: configs/tta_train_side_pilot_v2/NUDT-SIRST.txt
+      ordered_pilot64_ids_sha256: 5c6c8b441eab5277611fa1007354692df557db311e2d7969e34ebeaba3ae00e4
+
+topology:
+  dataset_ids: [IRSTD-1K, NUAA-SIRST, NUDT-SIRST]
+  corruption_family_ids:
+    [gaussian_noise, gaussian_blur, low_contrast, stripe_noise]
+  severities: [S1, S3, S5]
+  condition_count_per_dataset: 13
+  nonclean_condition_count_per_dataset: 12
+  probe_ids: [lf_mask, hf_noise]
+  probe_observation_semantics: one_image_condition_probe_is_one_probe_episode
+  mechanism_id: ASB-SFR_C0
+  expected_unique_nonclean_probe_episodes_for_shared_mechanism: 4608
+  expected_nonclean_probe_episodes_per_dataset: 1536
+  expected_nonclean_probe_episodes_per_family: 1152
+  parameter_spaces_over_same_unique_episodes: [R-E1, R-D0, P2]
+  forbidden_interpretation: three_spaces_are_not_three_independent_activity_samples
+  expected_identity_comparisons_per_space: 192
+
+diagnostic_virtual_steps:
+  purpose: C0_direction_diagnostic_not_C1_optimization_hyperparameter
+  direction: negative_proxy_gradient
+  clip_rule: min_1_radius_over_norm_plus_epsilon
+  nonzero_epsilon: 1.0e-12
+  R-E1:
+    radius_mode: absolute_l2
+    radius_value: 0.25
+  R-D0:
+    radius_mode: absolute_l2
+    radius_value: 0.25
+  P2:
+    radius_mode: relative_to_source_parameter_l2
+    radius_value: 0.0005
+
+# Audit-only use of train masks.  The adapter never receives this region.  A
+# proximal episode is one whose active mask intersects the binary dilation of
+# the train GT at least once.  Requiring >=5% of active episodes avoids treating
+# one accidental pixel as evidence while avoiding a target-size-biased global
+# active-pixel-ratio threshold for tiny targets.
+candidate_proximal_activity_audit:
+  reference: train_ground_truth_mask
+  available_to_adapter: false
+  use: outer_signal_audit_only
+  spatial_operator: binary_dilation
+  neighborhood: chebyshev
+  radius_input_pixels: 5
+  proximal_episode_indicator: active_support_intersects_dilated_train_gt
+  aggregation_denominator: nonclean_active_support_episodes
+  preregistered_minimum_fraction: 0.05
+
+stage_c0_science_gate:
+  mechanism_id: ASB-SFR_C0
+  dataset_ids: [IRSTD-1K, NUAA-SIRST, NUDT-SIRST]
+  family_ids: [gaussian_noise, gaussian_blur, low_contrast, stripe_noise]
+  space_ids: [R-E1, R-D0, P2]
+  space_virtual_step_contracts:
+    R-E1:
+      radius_mode: absolute_l2
+      radius_value: 0.25
+      nonzero_epsilon: 1.0e-12
+      direction: negative_proxy_gradient
+      clip_rule: min_1_radius_over_norm_plus_epsilon
+    R-D0:
+      radius_mode: absolute_l2
+      radius_value: 0.25
+      nonzero_epsilon: 1.0e-12
+      direction: negative_proxy_gradient
+      clip_rule: min_1_radius_over_norm_plus_epsilon
+    P2:
+      radius_mode: relative_to_source_parameter_l2
+      radius_value: 0.0005
+      nonzero_epsilon: 1.0e-12
+      direction: negative_proxy_gradient
+      clip_rule: min_1_radius_over_norm_plus_epsilon
+  expected_nonclean_probe_episode_count: 4608
+  expected_nonclean_probe_episode_count_per_dataset: 1536
+  expected_nonclean_probe_episode_count_per_family: 1152
+  expected_identity_comparison_count_per_space: 192
+
+  minimum_nonclean_finite_nonzero_proxy_gradient_fraction: 0.80
+  minimum_nonclean_active_support_episode_fraction: 0.30
+  minimum_candidate_proximal_active_episode_fraction_among_active: 0.05
+
+  dataset_cosine_strictly_greater_than: 0.0
+  minimum_positive_dataset_cosines: 2
+  macro_cosine_strictly_greater_than: 0.08
+
+  # The scalar is d L_task(theta - eta*g_proxy) / d eta at eta=0 after
+  # proxy-gradient normalization; negative therefore predicts improvement.
+  virtual_task_derivative_improvement_relation: strictly_less_than_zero
+  minimum_improving_families: 3
+
+  # Crossing is recorded per space, but v6 places its 2% hard threshold at C3
+  # (§7.5), not C0 (§7.2).  It therefore cannot reject C0 evidence.
+  require_identity_bit_exact: true
+  filter_before_reporting_eligible_spaces: true
+  zero_signal_spaces_eligible: false
+
+selection_and_exit:
+  order:
+    - validate_exact_schema_and_counts
+    - apply_shared_mechanism_activity_gates_once
+    - apply_gradient_alignment_gates_per_space
+    - report_eligible_spaces_in_frozen_roster_order
+    - authorize_predefined_train_only_C1_if_any_space_is_eligible
+  c0_top_k_ranking: forbidden_not_part_of_C0
+  threshold_crossing_at_C0: report_only_not_eligibility
+  o4_policy: inactive_O4_has_zero_contribution_and_no_ranking_bonus
+  no_eligible_status: scientific_no_eligible
+  no_eligible_exit: normal_early_stop_exit_0
+  c0_pass_next_stage: train_only_C1_four_fold_cross_fit
+  r1_r2_allowed_by_c0: false
+  formal_test_allowed_by_c0: false
+
+purity_contract:
+  module: analysis/stage_c_science_gate_v1.py
+  forbidden:
+    - filesystem_read
+    - filesystem_write
+    - directory_creation
+    - dataset_read
+    - model_load
+    - CUDA_initialization
+    - GPU_lease
+    - worker_launch
+  launcher_order: validate_contract_then_gate_then_optional_side_effects
